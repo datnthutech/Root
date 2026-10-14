@@ -1,1 +1,10 @@
+build/
+.gradle/
+node_modules/
+dist/
+.env
+.idea/
+.vscode/
+.DS_Store
+*.log
 .superpowers/
