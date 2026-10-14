@@ -31,6 +31,8 @@ app:
     access-minutes: 15
     refresh-days: 14
   cookie-secure: ${COOKIE_SECURE:false}
+  dev-seed:
+    persons: ${DEV_SEED_PERSONS:0}
   bootstrap-admin:
     username: ${BOOTSTRAP_ADMIN_USER:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
