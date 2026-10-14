@@ -32,7 +32,7 @@ class ClanMemberServiceTest {
             ParentChild pc = new ParentChild(); pc.setParentId(parent.getId()); pc.setChildId(kid.getId()); links.save(pc);
         }
         ParentChild gone = new ParentChild(); gone.setParentId(root.getId()); gone.setChildId(softDeleted.getId()); links.save(gone);
-        softDeleted.setDeletedAt(java.time.Instant.now()); persons.save(softDeleted);
+        softDeleted.setDeletedAt(java.time.Instant.now()); persons.saveAndFlush(softDeleted);
 
         Clan c = new Clan(); c.setName("Họ"); c.setFounderPersonId(root.getId()); c = clans.save(c);
         int n = service.rebuild(c.getId());
