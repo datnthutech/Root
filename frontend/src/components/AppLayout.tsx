@@ -1,0 +1,24 @@
+import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { Button, Layout, Space } from 'antd'
+import { useAuth } from '../auth/AuthContext'
+import { hasRole } from '../auth/RequireAuth'
+
+export default function AppLayout() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  return (
+    <Layout style={{ minHeight: '100vh' }}>
+      <Layout.Header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px' }}>
+        <Space size="large">
+          <Link to="/" style={{ color: '#fff', fontWeight: 600 }}>Gia phả</Link>
+          {hasRole(user, 'ADMIN') && <Link to="/admin/users" style={{ color: '#fff' }}>Quản lý tài khoản</Link>}
+        </Space>
+        <Space>
+          <span style={{ color: '#fff' }}>{user?.displayName ?? user?.username}</span>
+          <Button size="small" onClick={async () => { await logout(); navigate('/login') }}>Đăng xuất</Button>
+        </Space>
+      </Layout.Header>
+      <Layout.Content><Outlet /></Layout.Content>
+    </Layout>
+  )
+}

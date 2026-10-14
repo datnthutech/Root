@@ -1,9 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { AuthContext } from './auth/AuthContext'
 import App from './App'
 
-test('trang chủ hiển thị tên ứng dụng và liên kết sang trang thử', () => {
-  render(<MemoryRouter><App /></MemoryRouter>)
-  expect(screen.getByText('Gia phả')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Bản thử vẽ' })).toHaveAttribute('href', '/proto')
+test('chưa đăng nhập vào / thì thấy trang đăng nhập', () => {
+  render(
+    <AuthContext.Provider value={{ user: null, loading: false, login: async () => {}, logout: async () => {} }}>
+      <MemoryRouter initialEntries={['/']}><App /></MemoryRouter>
+    </AuthContext.Provider>,
+  )
+  expect(screen.getByText('Đăng nhập gia phả')).toBeInTheDocument()
 })
