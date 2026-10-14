@@ -4,7 +4,7 @@ import { runLayout } from './layoutClient'
 import { TreeRenderer } from './TreeRenderer'
 
 export default function ProtoPage() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const hostRef = useRef<HTMLDivElement>(null)
   const rendererRef = useRef<TreeRenderer | null>(null)
   const [total, setTotal] = useState(2000)
   const [layoutMs, setLayoutMs] = useState<number | null>(null)
@@ -13,13 +13,17 @@ export default function ProtoPage() {
   const [bench, setBench] = useState<string>('')
 
   useEffect(() => {
-    const r = new TreeRenderer(canvasRef.current!, {
+    // Canvas tạo mới mỗi lần mount: Pixi destroy làm mất WebGL context, StrictMode sẽ mount lại trên cùng canvas.
+    const canvas = document.createElement('canvas')
+    canvas.style.cssText = 'width:100%;height:100%;display:block'
+    hostRef.current!.appendChild(canvas)
+    const r = new TreeRenderer(canvas, {
       onHover: (id, s) => setHover(id === null ? null : { id, x: s.x, y: s.y }),
       onClick: (id) => console.info('click', id),
     })
     rendererRef.current = r
     const timer = setInterval(() => setFps(Math.round(r.fps())), 500)
-    return () => { clearInterval(timer); r.destroy() }
+    return () => { clearInterval(timer); r.destroy(); canvas.remove(); rendererRef.current = null }
   }, [])
 
   useEffect(() => {
@@ -42,7 +46,7 @@ export default function ProtoPage() {
 
   return (
     <div style={{ position: 'fixed', inset: 0 }}>
-      <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+      <div ref={hostRef} style={{ position: 'absolute', inset: 0 }} />
       <div style={{ position: 'absolute', top: 8, left: 8, background: '#fffd', padding: 8, borderRadius: 6 }}>
         <select value={total} onChange={(e) => setTotal(Number(e.target.value))}>
           <option value={2000}>2.000 người</option>
