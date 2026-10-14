@@ -27,3 +27,30 @@ test('ô nằm ngoài bounds ban đầu vẫn tìm thấy được', () => {
   qt.insert({ id: 3, x: 40, y: 40, w: 10, h: 10 })
   expect(qt.queryPoint(505, 505)?.id).toBe(1)
 })
+
+test('ô nhô ra trái/trên khỏi bounds vẫn tìm thấy', () => {
+  const qt = new QuadTree({ x: 0, y: 0, w: 100, h: 100 }, 1, 4)
+  qt.insert({ id: 1, x: -5, y: -5, w: 20, h: 10 })
+  qt.insert({ id: 2, x: 60, y: 60, w: 10, h: 10 })
+  qt.insert({ id: 3, x: 80, y: 20, w: 10, h: 10 })
+  expect(qt.queryPoint(-3, 3)?.id).toBe(1)
+  expect(qt.queryPoint(5, -3)?.id).toBe(1)
+})
+
+test('ô nhô ra phải/dưới khỏi bounds vẫn tìm thấy', () => {
+  const qt = new QuadTree({ x: 0, y: 0, w: 100, h: 100 }, 1, 4)
+  qt.insert({ id: 1, x: 95, y: 95, w: 20, h: 20 })
+  qt.insert({ id: 2, x: 10, y: 10, w: 10, h: 10 })
+  qt.insert({ id: 3, x: 30, y: 30, w: 10, h: 10 })
+  expect(qt.queryPoint(110, 97)?.id).toBe(1)
+  expect(qt.queryPoint(97, 110)?.id).toBe(1)
+})
+
+test('ô cắt ngang đường giữa được tìm thấy ở cả hai phía', () => {
+  const qt = new QuadTree({ x: 0, y: 0, w: 100, h: 100 }, 1, 4)
+  qt.insert({ id: 1, x: 45, y: 10, w: 10, h: 10 })
+  qt.insert({ id: 2, x: 10, y: 10, w: 10, h: 10 })
+  qt.insert({ id: 3, x: 70, y: 70, w: 10, h: 10 })
+  expect(qt.queryPoint(47, 15)?.id).toBe(1)
+  expect(qt.queryPoint(53, 15)?.id).toBe(1)
+})

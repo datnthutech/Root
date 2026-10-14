@@ -16,8 +16,8 @@ export class QuadTree {
   ) {}
 
   insert(it: Item): void {
-    // Ô nằm ngoài bounds ban đầu được giữ tại nút gốc để vẫn tìm thấy.
-    if (this.depth === 0 && !hit(this.bounds, it.x, it.y, it.w, it.h)) { this.items.push(it); return }
+    // Ô không nằm trọn trong bounds ban đầu (ngoài hẳn hoặc nhô ra) được giữ tại nút gốc để vẫn tìm thấy.
+    if (this.depth === 0 && !this.contains(it)) { this.items.push(it); return }
     if (this.children) {
       const i = this.childIndex(it)
       if (i >= 0) this.children[i].insert(it)
@@ -53,6 +53,11 @@ export class QuadTree {
     const old = this.items
     this.items = []
     for (const it of old) this.insert(it)
+  }
+
+  private contains(it: Item): boolean {
+    const b = this.bounds
+    return it.x >= b.x && it.y >= b.y && it.x + it.w <= b.x + b.w && it.y + it.h <= b.y + b.h
   }
 
   private childIndex(it: Item): number {
