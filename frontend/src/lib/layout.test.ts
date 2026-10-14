@@ -97,3 +97,14 @@ test('10.000 người bố cục dưới 1 giây', () => {
   expect(r.nodes).toHaveLength(10000)
   expect(ms).toBeLessThan(1000)
 })
+
+test('node đánh dấu lead / hasKids / collapsed', () => {
+  const g = G([P(1), P(2, { gender: 'F' }), P(3)], [U(1, 1, 2)], [L(1, 3, 1), L(2, 3, 1)])
+  const open = computeLayout(g)
+  expect(at(open, 1)).toMatchObject({ lead: true, hasKids: true, collapsed: false })
+  expect(at(open, 2)).toMatchObject({ lead: false, hasKids: false, collapsed: false })
+  expect(at(open, 3)).toMatchObject({ lead: true, hasKids: false, collapsed: false })
+  const closed = computeLayout(g, { collapsed: new Set([1]) })
+  expect(at(closed, 1)).toMatchObject({ lead: true, hasKids: true, collapsed: true })
+  expect(closed.nodes.map((n) => n.id).sort()).toEqual([1, 2])
+})

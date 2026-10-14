@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { getCachedLayout, setCachedLayout, layoutCacheKey } from './layoutCache'
 
-const r = { nodes: [{ id: 1, x: 0, y: 0, w: 120, h: 60, generation: 1 }], edges: [], width: 120, height: 60 }
+const r = { nodes: [{ id: 1, x: 0, y: 0, w: 120, h: 60, generation: 1, lead: true, hasKids: false, collapsed: false }], edges: [], width: 120, height: 60 }
 
 test('ghi rồi đọc lại đúng kết quả; khoá khác ETag thì không thấy', async () => {
   const k1 = layoutCacheKey(1, 'etag-a', 'both', [])
