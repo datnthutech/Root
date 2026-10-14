@@ -54,4 +54,26 @@ class SiblingOrderServiceTest {
         assertThat(r).doesNotContainKey(adopted.getId());
         assertThat(r).doesNotContainKey(dad.getId());
     }
+
+    @Test
+    void softDeletedChildIsExcludedAndDoesNotConsumeOrder() {
+        Person dad = p("Cha", Gender.M, 1920), mom = p("Mẹ", Gender.F, 1925);
+        UnionRel u = new UnionRel(); u.setPartnerAId(dad.getId()); u.setPartnerBId(mom.getId()); u = unions.save(u);
+        Person a = p("A", Gender.M, 1950), b = p("B", Gender.F, 1952), c = p("C", Gender.F, 1955), gone = p("X", Gender.M, 1951);
+        for (Person k : new Person[]{a, b, c, gone}) { link(dad, k, u, true); link(mom, k, u, true); }
+        gone.setDeletedAt(java.time.Instant.now());
+        persons.saveAndFlush(gone);
+
+        Clan clan = new Clan(); clan.setName("Họ Test"); clan.setFounderPersonId(dad.getId()); clan = clans.save(clan);
+        for (Person x : new Person[]{dad, mom, a, b, c, gone}) {
+            ClanMember m = new ClanMember(); m.setClanId(clan.getId()); m.setPersonId(x.getId());
+            m.setMembership(Membership.BLOOD); m.setGeneration(1); members.save(m);
+        }
+
+        var r = service.computeForClan(clan.getId());
+        assertThat(r).doesNotContainKey(gone.getId());
+        assertThat(r.get(a.getId()).label()).isEqualTo("anh Hai");
+        assertThat(r.get(b.getId()).label()).isEqualTo("chị Ba");
+        assertThat(r.get(c.getId()).label()).isEqualTo("chị Út (thứ Tư)");
+    }
 }

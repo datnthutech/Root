@@ -41,7 +41,7 @@ public class SiblingOrderService {
         if (childIds.isEmpty()) return Map.of();
 
         Map<Long, Object[]> childInfo = new HashMap<>();
-        jdbc.query("SELECT id, gender, birth_date, birth_order_override FROM person WHERE id = ANY(?)",
+        jdbc.query("SELECT id, gender, birth_date, birth_order_override FROM person WHERE id = ANY(?) AND deleted_at IS NULL",
             rs -> { childInfo.put(rs.getLong(1), new Object[]{Gender.valueOf(rs.getString(2)),
                 rs.getDate(3) == null ? null : rs.getDate(3).toLocalDate(), (Integer) rs.getObject(4)}); },
             (Object) childIds.toArray(Long[]::new));
