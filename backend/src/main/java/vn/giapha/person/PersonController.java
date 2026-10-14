@@ -10,8 +10,12 @@ import vn.giapha.auth.AuthUser;
 @PreAuthorize("hasRole('VIEWER')")
 public class PersonController {
     private final PersonProfileService profiles;
+    private final FamilyService family;
 
-    public PersonController(PersonProfileService profiles) { this.profiles = profiles; }
+    public PersonController(PersonProfileService profiles, FamilyService family) {
+        this.profiles = profiles;
+        this.family = family;
+    }
 
     @GetMapping("/{id}")
     public PersonProfile get(@PathVariable long id, @AuthenticationPrincipal AuthUser me) {
@@ -20,4 +24,7 @@ public class PersonController {
 
     @GetMapping("/{id}/biography")
     public BiographyResponse biography(@PathVariable long id) { return profiles.biography(id); }
+
+    @GetMapping("/{id}/family")
+    public FamilyService.FamilyResponse family(@PathVariable long id) { return family.family(id); }
 }
