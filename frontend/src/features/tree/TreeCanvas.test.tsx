@@ -40,3 +40,17 @@ test('đặt data-tree-ready = số nút sau setData và xoá khi unmount', () =
   unmount()
   expect(document.documentElement.dataset.treeReady).toBeUndefined()
 })
+
+test('đổi graph/layout: dấu sẵn sàng được cập nhật, và xoá khi mất dữ liệu', () => {
+  const noop = () => {}
+  const mk = (graph: unknown, layout: unknown) => (
+    <TreeCanvas graph={graph as never} layout={layout as never} keepCamera={false} selectedId={null}
+      onHover={noop} onClick={noop} onToggle={noop} onViewChange={noop} />
+  )
+  const { rerender } = render(mk({ a: 1 }, { nodes: [{}, {}] }))
+  expect(document.documentElement.dataset.treeReady).toBe('2')
+  rerender(mk({ a: 2 }, { nodes: [{}, {}, {}, {}, {}] }))
+  expect(document.documentElement.dataset.treeReady).toBe('5')
+  rerender(mk(null, null))
+  expect(document.documentElement.dataset.treeReady).toBeUndefined()
+})

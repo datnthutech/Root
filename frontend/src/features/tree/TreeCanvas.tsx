@@ -54,8 +54,11 @@ export const TreeCanvas = forwardRef<TreeCanvasHandle, Props>(function TreeCanva
   }, [])
 
   useEffect(() => {
-    if (props.graph && props.layout) {
-      rendererRef.current?.setData(props.graph, props.layout, { keepCamera: props.keepCamera })
+    // dấu sẵn sàng: xoá trước, chỉ đặt lại khi renderer thực sự đã nhận dữ liệu
+    delete document.documentElement.dataset.treeReady
+    const r = rendererRef.current
+    if (r && props.graph && props.layout) {
+      r.setData(props.graph, props.layout, { keepCamera: props.keepCamera })
       document.documentElement.dataset.treeReady = String(props.layout.nodes.length)
     }
   }, [props.graph, props.layout, props.keepCamera])
