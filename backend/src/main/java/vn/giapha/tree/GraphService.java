@@ -27,7 +27,7 @@ public class GraphService {
     }
 
     static String thumb(long id, String photoKey) {
-        return photoKey == null ? null : "/persons/" + id + "/photo?size=96&v=" + photoKey;
+        return vn.giapha.person.PhotoService.thumbUrl(id, photoKey);
     }
 
     public List<GraphDtos.ClanSummary> listClans() {

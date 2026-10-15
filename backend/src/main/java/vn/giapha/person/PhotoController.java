@@ -24,14 +24,19 @@ public class PhotoController {
     @PreAuthorize("hasRole('EDITOR')")
     public UploadResponse upload(@AuthenticationPrincipal AuthUser me, @PathVariable long id, @RequestParam("file") MultipartFile file) {
         Person p = photos.upload(me, id, file);
-        return new UploadResponse(id, p.getPhotoKey(), "/persons/" + id + "/photo?size=96&v=" + p.getPhotoKey());
+        return new UploadResponse(id, p.getPhotoKey(), PhotoService.thumbUrl(id, p.getPhotoKey()));
     }
 
     @GetMapping("/{id}/photo")
     @PreAuthorize("hasRole('VIEWER')")
-    public ResponseEntity<byte[]> download(@PathVariable long id, @RequestParam(defaultValue = "256") String size) {
+    public ResponseEntity<byte[]> download(@PathVariable long id, @RequestParam(defaultValue = "256") String size,
+                                         @RequestParam(required = false) String v) {
         var stored = photos.read(id, size).orElseThrow(() -> new ApiException(org.springframework.http.HttpStatus.NOT_FOUND, "NOT_FOUND", "Chưa có ảnh"));
-        return ResponseEntity.ok().contentType(MediaType.parseMediaType(stored.contentType()))
-            .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePrivate().immutable()).body(stored.data());
+        String ct = stored.contentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : stored.contentType();
+        // immutable chỉ khi URL có phiên bản (v=photoKey); nếu không, ảnh có thể đổi nên phải xác thực lại
+        CacheControl cc = v != null && !v.isBlank()
+            ? CacheControl.maxAge(365, TimeUnit.DAYS).cachePrivate().immutable()
+            : CacheControl.noCache().cachePrivate();
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(ct)).cacheControl(cc).body(stored.data());
     }
 }

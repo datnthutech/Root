@@ -7,6 +7,8 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import vn.giapha.audit.AuditService;
 import vn.giapha.audit.Snapshots;
@@ -18,6 +20,7 @@ import vn.giapha.storage.ThumbnailService;
 @Service
 public class PhotoService {
     private static final Set<String> TYPES = Set.of("image/jpeg", "image/png");
+    static final long MAX_BYTES = 5L * 1024 * 1024;
     private final PersonRepository persons;
     private final EditPolicy policy;
     private final PhotoStorage storage;
@@ -41,10 +44,14 @@ public class PhotoService {
         if (file.getContentType() == null || !TYPES.contains(file.getContentType())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Chỉ nhận ảnh JPEG hoặc PNG");
         }
+        if (file.getSize() > MAX_BYTES) {
+            throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "PAYLOAD_TOO_LARGE", "Tệp quá lớn (tối đa 5 MB)");
+        }
         byte[] data;
         try { data = file.getBytes(); } catch (IOException e) { throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Không đọc được tệp"); }
-        byte[] t96 = thumbs.square(data, 96);       // ném 400 nếu không phải ảnh — trước khi ghi bất cứ thứ gì
-        byte[] t256 = thumbs.square(data, 256);
+        var t = thumbs.squares(data, 96, 256);      // ném 400 nếu không phải ảnh — trước khi ghi bất cứ thứ gì
+        byte[] t96 = t.get(0);
+        byte[] t256 = t.get(1);
 
         String oldKey = p.getPhotoKey();
         String newKey = UUID.randomUUID().toString();
@@ -56,8 +63,21 @@ public class PhotoService {
         p.setPhotoKey(newKey);
         p = persons.saveAndFlush(p);
         audit.record(me.id(), "PERSON", personId, "SET_PHOTO", before, Snapshots.of(p));
-        if (oldKey != null) for (String s : new String[]{"orig", "96", "256"}) storage.delete(key(personId, oldKey, s));
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { if (oldKey != null) deleteAll(personId, oldKey); }
+            @Override public void afterCompletion(int status) { if (status == STATUS_ROLLED_BACK) deleteAll(personId, newKey); }
+        });
         return p;
+    }
+
+    private void deleteAll(long personId, String photoKey) {
+        for (String s : new String[]{"orig", "96", "256"}) {
+            try { storage.delete(key(personId, photoKey, s)); } catch (RuntimeException ignored) { /* dọn dẹp best-effort */ }
+        }
+    }
+
+    public static String thumbUrl(long id, String photoKey) {
+        return photoKey == null ? null : "/persons/" + id + "/photo?size=96&v=" + photoKey;
     }
 
     @Transactional(readOnly = true)

@@ -50,7 +50,7 @@ class PhotoApiTest {
         mvc.perform(multipart(HttpMethod.PUT, "/api/v1/persons/{id}/photo", ids.a()).file(file(png(), "image/png"))
             .header("Authorization", users.bearer(Role.ADMIN)))
            .andExpect(status().isOk()).andExpect(jsonPath("$.photoKey").isNotEmpty());
-        byte[] t96 = mvc.perform(get("/api/v1/persons/" + ids.a() + "/photo?size=96").header("Authorization", users.bearer(Role.VIEWER)))
+        byte[] t96 = mvc.perform(get("/api/v1/persons/" + ids.a() + "/photo?size=96&v=x").header("Authorization", users.bearer(Role.VIEWER)))
             .andExpect(status().isOk()).andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("immutable")))
             .andReturn().getResponse().getContentAsByteArray();
         assertThat(ImageIO.read(new ByteArrayInputStream(t96)).getWidth()).isEqualTo(96);
@@ -69,13 +69,55 @@ class PhotoApiTest {
            .andExpect(jsonPath("$.persons[?(@.id==" + ids.a() + ")].thumb").value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.startsWith("/persons/" + ids.a() + "/photo?size=96&v="))));
     }
 
+    private void fireSyncs(java.util.function.Consumer<org.springframework.transaction.support.TransactionSynchronization> f) {
+        new java.util.ArrayList<>(org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()).forEach(f);
+    }
+
     @Test
-    void replacingPhotoDeletesOldObjects() throws Exception {
+    void replacingPhotoDeletesOldObjectsAfterCommit() throws Exception {
         var ids = fixture.create();
         String admin = users.bearer(Role.ADMIN);
         mvc.perform(multipart(HttpMethod.PUT, "/api/v1/persons/{id}/photo", ids.a()).file(file(png(), "image/png")).header("Authorization", admin)).andExpect(status().isOk());
+        var firstKeys = new java.util.HashSet<>(storage.data.keySet());
+        assertThat(firstKeys).hasSize(3);
         mvc.perform(multipart(HttpMethod.PUT, "/api/v1/persons/{id}/photo", ids.a()).file(file(png(), "image/png")).header("Authorization", admin)).andExpect(status().isOk());
+        // trước commit: chưa xoá gì, cả hai bộ cùng tồn tại
+        assertThat(storage.data).hasSize(6);
+        // tests chạy trong giao dịch không commit, nên tự gọi callback afterCommit như Spring sẽ làm
+        fireSyncs(sync -> sync.afterCommit());
+        assertThat(storage.data).hasSize(3).doesNotContainKeys(firstKeys.toArray(new String[0]));
+    }
+
+    @Test
+    void rollbackDeletesNewlyUploadedObjects() throws Exception {
+        var ids = fixture.create();
+        mvc.perform(multipart(HttpMethod.PUT, "/api/v1/persons/{id}/photo", ids.a()).file(file(png(), "image/png"))
+            .header("Authorization", users.bearer(Role.ADMIN))).andExpect(status().isOk());
         assertThat(storage.data).hasSize(3);
+        fireSyncs(sync -> sync.afterCompletion(org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK));
+        assertThat(storage.data).isEmpty();
+    }
+
+    @Test
+    void oversizeUploadIsRejectedWith413() throws Exception {
+        var ids = fixture.create();
+        byte[] big = new byte[5 * 1024 * 1024 + 1];
+        mvc.perform(multipart(HttpMethod.PUT, "/api/v1/persons/{id}/photo", ids.a()).file(file(big, "image/png"))
+            .header("Authorization", users.bearer(Role.ADMIN)))
+           .andExpect(status().isPayloadTooLarge()).andExpect(jsonPath("$.code").value("PAYLOAD_TOO_LARGE"));
+        assertThat(storage.data).isEmpty();
+    }
+
+    @Test
+    void cacheControlIsImmutableOnlyWithVersionParam() throws Exception {
+        var ids = fixture.create();
+        String admin = users.bearer(Role.ADMIN);
+        mvc.perform(multipart(HttpMethod.PUT, "/api/v1/persons/{id}/photo", ids.a()).file(file(png(), "image/png")).header("Authorization", admin)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/persons/" + ids.a() + "/photo?size=96&v=abc").header("Authorization", admin))
+           .andExpect(header().string("Cache-Control", "max-age=31536000, private, immutable"));
+        mvc.perform(get("/api/v1/persons/" + ids.a() + "/photo?size=96").header("Authorization", admin))
+           .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.allOf(
+               org.hamcrest.Matchers.containsString("no-cache"), org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("immutable")))));
     }
 
     @Test

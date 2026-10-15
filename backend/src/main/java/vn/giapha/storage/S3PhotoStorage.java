@@ -31,7 +31,8 @@ public class S3PhotoStorage implements PhotoStorage {
         try { s3.headBucket(HeadBucketRequest.builder().bucket(bucket).build()); }
         catch (S3Exception e) {
             if (e.statusCode() != 404) throw e;
-            s3.createBucket(CreateBucketRequest.builder().bucket(bucket).build());
+            try { s3.createBucket(CreateBucketRequest.builder().bucket(bucket).build()); }
+            catch (BucketAlreadyOwnedByYouException | BucketAlreadyExistsException ignored) { /* created concurrently */ }
         }
         bucketReady = true;
     }
