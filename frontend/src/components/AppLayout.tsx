@@ -12,6 +12,7 @@ export default function AppLayout() {
         <Space size="large">
           <Link to="/" style={{ color: '#fff', fontWeight: 600 }}>Gia phả</Link>
           {hasRole(user, 'ADMIN') && <Link to="/admin/users" style={{ color: '#fff' }}>Quản lý tài khoản</Link>}
+          {hasRole(user, 'ADMIN') && <Link to="/admin/clans" style={{ color: '#fff' }}>Quản lý dòng họ</Link>}
         </Space>
         <Space>
           <span style={{ color: '#fff' }}>{user?.displayName ?? user?.username}</span>
