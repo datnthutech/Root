@@ -89,6 +89,17 @@ public class PersonService {
     }
 
     private static String blank(String s) { return s == null || s.isBlank() ? null : s.trim(); }
+    @Transactional
+    public Person setBirthOrder(AuthUser me, long id, Integer order) {
+        if (order != null && (order < 2 || order > 99)) throw bad("Thứ tự phải từ 2 đến 99");
+        Person p = persons.findByIdAndDeletedAtIsNull(id).orElseThrow(this::notFound);
+        var before = Snapshots.of(p);
+        p.setBirthOrderOverride(order);
+        p = persons.saveAndFlush(p);
+        audit.record(me.id(), "PERSON", id, "SET_BIRTH_ORDER", before, Snapshots.of(p));
+        return p;
+    }
+
     private ApiException bad(String m) { return new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", m); }
     private ApiException notFound() { return new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Không tìm thấy người này"); }
 }
