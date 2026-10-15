@@ -43,12 +43,13 @@ export default function TreePage() {
   // sau khi bố cục mới của chế độ focus sẵn sàng, đưa camera tới người trung tâm / người được yêu cầu
   useEffect(() => {
     if (!data.layout) return
+    if (data.keepCamera) return // đổi bố cục do +/- : giữ camera (renderer neo theo nút vừa bấm)
     const target = pendingFocus.current ?? (params?.mode === 'focus' ? params.personId : null)
-    if (target !== null && data.graph?.persons.some((p) => p.id === target)) {
-      setSelected(target)
-      setTimeout(() => canvas.current?.focusOn(target, 1), 0)
-    }
     pendingFocus.current = null
+    if (target === null || !data.graph?.persons.some((p) => p.id === target)) return
+    setSelected(target)
+    const t = setTimeout(() => canvas.current?.focusOn(target, 1), 0)
+    return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.layout])
 
@@ -74,7 +75,7 @@ export default function TreePage() {
   return (
     <div style={{ position: 'relative', height: 'calc(100vh - 64px)' }}>
       <TreeCanvas ref={canvas} graph={data.graph} layout={data.layout} keepCamera={data.keepCamera} selectedId={selected}
-        onHover={hover.onHover} onViewChange={setView} onToggle={data.toggle}
+        onHover={hover.onHover} onViewChange={setView} onToggle={(id) => { hover.hide(); data.toggle(id) }}
         onClick={(id) => { hover.hide(); setSelected(id); setDialogId(id) }} />
       <div style={{ position: 'absolute', top: 8, left: 8, right: 8, pointerEvents: 'none' }}>
         <div style={{ pointerEvents: 'auto', display: 'inline-block', maxWidth: '100%' }}>
