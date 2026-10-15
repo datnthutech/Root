@@ -12,6 +12,8 @@ const entry = (id: number, over: Partial<AuditEntry> = {}): AuditEntry => ({
   createdAt: '2026-10-14T01:00:00Z', summary: `Sửa hồ sơ «Tên ${id}»`, changes: [], revertible: true, ...over,
 })
 
+beforeEach(() => { vi.mocked(auditApi.list).mockReset(); vi.mocked(auditApi.revert).mockReset() })
+
 function setup(canRevert: boolean, onReverted = vi.fn()) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -52,6 +54,7 @@ test('khôi phục gọi API, báo cho cha và làm mới', async () => {
   await userEvent.click(await screen.findByRole('button', { name: 'Khôi phục' }))
   await userEvent.click(await screen.findByRole('button', { name: 'Khôi phục bản này' }))
   await waitFor(() => expect(auditApi.revert).toHaveBeenCalledWith(2))
+  await waitFor(() => expect(auditApi.list).toHaveBeenCalledTimes(2))
   expect(onReverted).toHaveBeenCalled()
 })
 
@@ -78,4 +81,22 @@ test('chưa có lịch sử thì hiện trạng thái trống', async () => {
   vi.mocked(auditApi.list).mockResolvedValue([])
   setup(false)
   expect(await screen.findByText('Chưa có lịch sử sửa')).toBeInTheDocument()
+})
+
+test('lỗi NOT_REVERTIBLE hiện thông báo riêng', async () => {
+  vi.mocked(auditApi.list).mockResolvedValue([entry(2)])
+  vi.mocked(auditApi.revert).mockRejectedValue({ code: 'NOT_REVERTIBLE', status: 409 })
+  setup(true)
+  await userEvent.click(await screen.findByRole('button', { name: 'Khôi phục' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Khôi phục bản này' }))
+  expect(await screen.findByText('Mục này không khôi phục được')).toBeInTheDocument()
+})
+
+test('lỗi không rõ mã hiện thông báo chung', async () => {
+  vi.mocked(auditApi.list).mockResolvedValue([entry(2)])
+  vi.mocked(auditApi.revert).mockRejectedValue(new Error('boom'))
+  setup(true)
+  await userEvent.click(await screen.findByRole('button', { name: 'Khôi phục' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Khôi phục bản này' }))
+  expect(await screen.findByText('Đã có lỗi xảy ra, vui lòng thử lại')).toBeInTheDocument()
 })

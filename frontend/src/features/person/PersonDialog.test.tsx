@@ -6,14 +6,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import PersonDialog from './PersonDialog'
 import { personApi } from '../../api/person'
 import { editApi } from '../../api/edit'
+import { auditApi } from '../../api/audit'
 
 vi.mock('../../api/edit', async (orig) => ({ ...(await orig<typeof import('../../api/edit')>()), editApi: { deletePerson: vi.fn() } }))
+vi.mock('../../api/audit', async (orig) => ({ ...(await orig<typeof import('../../api/audit')>()), auditApi: { list: vi.fn(), revert: vi.fn() } }))
 vi.mock('../../api/person', async (orig) => ({ ...(await orig<typeof import('../../api/person')>()), personApi: { profile: vi.fn(), family: vi.fn(), biography: vi.fn() } }))
 
 const ref = (id: number, name: string, orderLabel: string | null = null) =>
   ({ id, name, gender: 'M' as const, birthYear: 1950, deathYear: null, alive: true, orderLabel, linkId: null })
 
 beforeEach(() => {
+  vi.mocked(auditApi.list).mockReset()
+  vi.mocked(auditApi.list).mockResolvedValue([{ id: 2, userId: 1, username: 'e', displayName: 'Biên Tập', entityType: 'PERSON', entityId: 5, action: 'UPDATE', createdAt: '2026-10-14T01:00:00Z', summary: 'Sửa hồ sơ «An»', changes: [], revertible: true }])
   vi.mocked(personApi.profile).mockResolvedValue({
     id: 5, fullName: 'Nguyễn Văn An', gender: 'M', birthDate: '1925-03-04', birthPrecision: 'DAY', birthYear: 1925, alive: false,
     deathDate: '1990-01-01', deathPrecision: 'YEAR', deathYear: 1990, deathAnniversaryLunar: '12/3 âm lịch', originPlace: 'Bến Tre',
@@ -108,3 +112,25 @@ test('ADMIN xoá người: gọi deletePerson, đóng popup và báo cây làm m
   await waitFor(() => expect(editApi.deletePerson).toHaveBeenCalledWith(5))
   await waitFor(() => expect(onClose).toHaveBeenCalled())
 }, 20000)
+
+test('VIEWER không có tab Lịch sử sửa và không gọi API audit', async () => {
+  setup()
+  await screen.findByText('Nguyễn Văn An')
+  expect(screen.queryByRole('tab', { name: 'Lịch sử sửa' })).not.toBeInTheDocument()
+  expect(auditApi.list).not.toHaveBeenCalled()
+})
+
+test('EDITOR thấy tab Lịch sử sửa nhưng không có nút Khôi phục', async () => {
+  setup(vi.fn(), vi.fn(), 'EDITOR')
+  await screen.findByText('Nguyễn Văn An')
+  await userEvent.click(screen.getByRole('tab', { name: 'Lịch sử sửa' }))
+  expect(await screen.findByText('Sửa hồ sơ «An»')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Khôi phục' })).not.toBeInTheDocument()
+})
+
+test('ADMIN thấy tab Lịch sử sửa và nút Khôi phục', async () => {
+  setup(vi.fn(), vi.fn(), 'ADMIN')
+  await screen.findByText('Nguyễn Văn An')
+  await userEvent.click(screen.getByRole('tab', { name: 'Lịch sử sửa' }))
+  expect(await screen.findByRole('button', { name: 'Khôi phục' })).toBeInTheDocument()
+})

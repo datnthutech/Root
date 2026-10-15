@@ -28,6 +28,7 @@ export default function PersonDialog({ personId, onClose, onNavigate, onTreeChan
     void qc.invalidateQueries({ queryKey: ['person'] })
     void qc.invalidateQueries({ queryKey: ['person-family'] })
     void qc.invalidateQueries({ queryKey: ['person-bio'] })
+    void qc.invalidateQueries({ queryKey: ['audit'] })
     onTreeChanged()
   }
   const close = () => { setEditing(false); onClose() }

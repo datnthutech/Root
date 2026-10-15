@@ -39,7 +39,7 @@ export default function AuditTab({ personId, canRevert, onReverted }: { personId
             <Typography.Text type="secondary">{formatDateTime(e.createdAt)} · {e.displayName ?? e.username ?? 'Hệ thống'}</Typography.Text>
             <Typography.Text strong>{e.summary}</Typography.Text>
             {e.changes.length > 0 && (
-              <Table size="small" pagination={false} rowKey="field" dataSource={e.changes} scroll={{ x: true }}
+              <Table size="small" pagination={false} rowKey={(c) => `${c.field}-${e.changes.indexOf(c)}`} dataSource={e.changes} scroll={{ x: true }}
                 columns={[{ title: 'Trường', dataIndex: 'label' }, { title: 'Trước', dataIndex: 'from' }, { title: 'Sau', dataIndex: 'to' }]} />
             )}
           </Space>
