@@ -4,7 +4,7 @@
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
-COMPOSE=(docker compose -f docker-compose.local.yml)
+COMPOSE=(docker compose -f docker-compose.yml)
 
 # Biến có thể ghi đè khi chạy, ví dụ:  SEED=2000 WEB_PORT=9000 ./deploy.sh up
 export WEB_PORT="${WEB_PORT:-7000}"

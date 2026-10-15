@@ -6,23 +6,15 @@ Web gia phả nhiều dòng họ (nội + ngoại) dạng cây dọc, kéo/phón
 - `backend/` — Spring Boot (Java), Flyway, PostgreSQL, MinIO (ảnh)
 - `frontend/` — giao diện (Vite), vẽ cây bằng canvas/WebGL, script đo `e2e/measure.mjs`
 - `ops/` — `backup/` (sao lưu, khôi phục, kiểm tra khôi phục), `caddy/` (HTTPS, proxy)
-- `docker-compose.yml` — hạ tầng phát triển; `docker-compose.prod.yml` — triển khai thật
+- `docker-compose.yml` — chạy local trong Docker (qua `deploy.sh`); `docker-compose.prod.yml` — triển khai thật
 - `docs/` — spec, kế hoạch, báo cáo, hướng dẫn vận hành
 
-## Chạy cục bộ bằng Docker (một lệnh)
+## Chạy cục bộ (toàn bộ trong Docker)
 ```bash
 ./deploy.sh          # build + chạy Postgres, MinIO, backend, frontend → http://localhost:7000 (admin / password123)
 ./deploy.sh help     # down | restart | reset | status | logs
 ```
-
-## Chạy cục bộ để phát triển (không đóng gói)
-```bash
-docker compose up -d
-# Backend (thư mục backend)
-DEV_SEED_PERSONS=2000 BOOTSTRAP_ADMIN_USER=admin BOOTSTRAP_ADMIN_PASSWORD=password123 ./gradlew bootRun
-# Frontend (thư mục frontend)
-npm install && npm run dev
-```
+Cổng: web 7000, API/Swagger 7080, MinIO console 7001 (đổi bằng `WEB_PORT`, `API_PORT`, `MINIO_PORT`). Chỉ cần Docker, không cần cài JDK/Node. `docker-compose.yml` là stack local; `docker-compose.prod.yml` dùng cho máy chủ thật.
 
 ## Kiểm thử
 ```bash
