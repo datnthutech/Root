@@ -30,7 +30,8 @@ test('giới hạn số lượt tải đồng thời', async () => {
   const s = new PhotoStore(fetchBlob, () => {}, { concurrency: 2 })
   for (let i = 0; i < 6; i++) s.get(`/p${i}`)
   for (let i = 0; i < 10; i++) await tick()
-  expect(peak).toBeLessThanOrEqual(2)
+  expect(peak).toBe(2)
+  for (let i = 0; i < 6; i++) expect(s.get(`/p${i}`)).not.toBeNull()
 })
 test('ảnh lỗi/404 không bị tải lại mỗi lần get', async () => {
   const fetchBlob = vi.fn(async () => null)
@@ -43,4 +44,50 @@ test('vượt max thì bỏ ảnh cũ nhất và thu hồi object URL', async ()
   const s = new PhotoStore(async () => new Blob(['x']), () => {}, { max: 2 })
   for (const u of ['/1', '/2', '/3']) { s.get(u); await tick(); await tick() }
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:1')
+})
+
+const load = async (s: PhotoStore, urls: string[]) => { for (const u of urls) { s.get(u); await tick(); await tick() } }
+
+test('vượt max chỉ thu hồi ảnh cũ nhất', async () => {
+  const s = new PhotoStore(async () => new Blob(['x']), () => {}, { max: 2 })
+  await load(s, ['/1', '/2', '/3'])
+  expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1)
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:1')
+})
+test('get làm mới độ gần đây (LRU)', async () => {
+  const s = new PhotoStore(async () => new Blob(['x']), () => {}, { max: 2 })
+  await load(s, ['/1', '/2'])
+  expect(s.get('/1')).toBe('blob:1')
+  await load(s, ['/3'])
+  expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1)
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:2')
+})
+test('destroy thu hồi mọi object URL', async () => {
+  const s = new PhotoStore(async () => new Blob(['x']), () => {})
+  await load(s, ['/1', '/2', '/3'])
+  s.destroy()
+  expect(URL.revokeObjectURL).toHaveBeenCalledTimes(3)
+  for (const n of [1, 2, 3]) expect(URL.revokeObjectURL).toHaveBeenCalledWith(`blob:${n}`)
+  expect(s.get('/1')).toBeNull()
+})
+test('tải dở dang xong sau destroy thì không tạo object URL, không onLoaded', async () => {
+  let resolve!: (b: Blob) => void
+  const onLoaded = vi.fn()
+  const s = new PhotoStore(() => new Promise<Blob>((r) => { resolve = r }), onLoaded)
+  s.get('/a')
+  await tick()
+  s.destroy()
+  resolve(new Blob(['x']))
+  await tick(); await tick()
+  expect(URL.createObjectURL).not.toHaveBeenCalled()
+  expect(onLoaded).not.toHaveBeenCalled()
+  expect(s.get('/a')).toBeNull()
+})
+test('get sau destroy không xếp hàng tải', async () => {
+  const fetchBlob = vi.fn(async () => new Blob(['x']))
+  const s = new PhotoStore(fetchBlob, () => {})
+  s.destroy()
+  expect(s.get('/a')).toBeNull()
+  await tick()
+  expect(fetchBlob).not.toHaveBeenCalled()
 })
