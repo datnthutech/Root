@@ -65,6 +65,14 @@ services:
     volumes:
       - backups:/backups
       - miniodata:/minio-data:ro
+    healthcheck:
+      # unhealthy nếu lần sao lưu thành công gần nhất (dấu .last_success) cũ hơn 26 giờ hoặc chưa có;
+      # start_period chừa thời gian cho lần chạy cron đầu tiên (02:30 UTC) sau khi triển khai
+      test: ["CMD-SHELL", "test -n \"$$(find /backups/.last_success -mmin -1560 2>/dev/null)\""]
+      interval: 30m
+      timeout: 10s
+      retries: 1
+      start_period: 26h
 volumes:
   pgdata:
   miniodata:
