@@ -55,6 +55,11 @@ public class PhotoService {
 
         String oldKey = p.getPhotoKey();
         String newKey = UUID.randomUUID().toString();
+        // đăng ký dọn dẹp TRƯỚC khi ghi để lỗi giữa chừng cũng không để lại đối tượng mồ côi
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { if (oldKey != null) deleteAll(personId, oldKey); }
+            @Override public void afterCompletion(int status) { if (status != STATUS_COMMITTED) deleteAll(personId, newKey); }
+        });
         storage.put(key(personId, newKey, "orig"), data, file.getContentType());
         storage.put(key(personId, newKey, "96"), t96, "image/jpeg");
         storage.put(key(personId, newKey, "256"), t256, "image/jpeg");
@@ -63,10 +68,6 @@ public class PhotoService {
         p.setPhotoKey(newKey);
         p = persons.saveAndFlush(p);
         audit.record(me.id(), "PERSON", personId, "SET_PHOTO", before, Snapshots.of(p));
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override public void afterCommit() { if (oldKey != null) deleteAll(personId, oldKey); }
-            @Override public void afterCompletion(int status) { if (status == STATUS_ROLLED_BACK) deleteAll(personId, newKey); }
-        });
         return p;
     }
 

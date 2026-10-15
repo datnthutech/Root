@@ -18,7 +18,7 @@ import vn.giapha.common.ApiException;
 
 @Service
 public class ThumbnailService {
-    private static final long MAX_PIXELS = 40_000_000L;
+    private static final long MAX_PIXELS = 25_000_000L;
     private static final int MAX_SIDE = 12_000;
 
     public byte[] square(byte[] image, int size) { return squares(image, size).get(0); }

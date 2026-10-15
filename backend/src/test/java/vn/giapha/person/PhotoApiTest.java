@@ -1,6 +1,7 @@
 package vn.giapha.person;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -31,6 +32,9 @@ class PhotoApiTest {
     @Autowired TreeFixture fixture;
     @Autowired InMemoryPhotoStorage storage;
     @Autowired PersonRepository persons;
+    @Autowired EditPolicy policy;
+    @Autowired vn.giapha.storage.ThumbnailService thumbsSvc;
+    @Autowired vn.giapha.audit.AuditService auditSvc;
 
     @org.junit.jupiter.api.BeforeEach
     void clearStorage() { storage.data.clear(); }  // bean dùng chung, không rollback theo @Transactional
@@ -94,6 +98,23 @@ class PhotoApiTest {
         mvc.perform(multipart(HttpMethod.PUT, "/api/v1/persons/{id}/photo", ids.a()).file(file(png(), "image/png"))
             .header("Authorization", users.bearer(Role.ADMIN))).andExpect(status().isOk());
         assertThat(storage.data).hasSize(3);
+        fireSyncs(sync -> sync.afterCompletion(org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK));
+        assertThat(storage.data).isEmpty();
+    }
+
+    @Test
+    void failedPutMidwayLeavesNoOrphansAfterRollback() throws Exception {
+        var ids = fixture.create();
+        int[] puts = {0};
+        var failing = new vn.giapha.storage.PhotoStorage() {
+            public void put(String k, byte[] d, String c) { if (++puts[0] == 3) throw new IllegalStateException("boom"); storage.put(k, d, c); }
+            public java.util.Optional<Stored> get(String k) { return storage.get(k); }
+            public void delete(String k) { storage.delete(k); }
+        };
+        var service = new PhotoService(persons, policy, failing, thumbsSvc, auditSvc);
+        var me = new AuthUser(users.create(Role.ADMIN).getId(), Role.ADMIN);
+        assertThatThrownBy(() -> service.upload(me, ids.a(), file(png(), "image/png"))).isInstanceOf(IllegalStateException.class);
+        assertThat(storage.data).hasSize(2);
         fireSyncs(sync -> sync.afterCompletion(org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK));
         assertThat(storage.data).isEmpty();
     }
