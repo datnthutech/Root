@@ -8,6 +8,7 @@ COMPOSE=(docker compose -f docker-compose.local.yml)
 
 # Biến có thể ghi đè khi chạy, ví dụ:  SEED=2000 WEB_PORT=9000 ./deploy.sh up
 export WEB_PORT="${WEB_PORT:-8088}"
+export API_PORT="${API_PORT:-8080}"
 export DEV_SEED_PERSONS="${SEED:-300}"          # số người mẫu (0 = DB trống); chỉ sinh khi chưa có dòng họ nào
 export BOOTSTRAP_ADMIN_USER="${ADMIN_USER:-admin}"
 export BOOTSTRAP_ADMIN_PASSWORD="${ADMIN_PASSWORD:-password123}"
@@ -24,7 +25,7 @@ Lệnh:
   logs [s]  Xem log (s = postgres|minio|backend|web, bỏ trống = tất cả)
   help      Hiện trợ giúp
 
-Biến môi trường (tuỳ chọn): SEED (mặc định 300), WEB_PORT (8088), ADMIN_USER (admin), ADMIN_PASSWORD (password123),
+Biến môi trường (tuỳ chọn): SEED (mặc định 300), WEB_PORT (8088), API_PORT (8080), ADMIN_USER (admin), ADMIN_PASSWORD (password123),
   NO_MINIO=1 (bỏ MinIO nếu không pull được image; upload ảnh sẽ không dùng được)
 USAGE
 }
@@ -45,7 +46,7 @@ wait_ready() {
       echo
       echo "Sẵn sàng:  ${URL}"
       echo "Đăng nhập: ${BOOTSTRAP_ADMIN_USER} / ${BOOTSTRAP_ADMIN_PASSWORD}"
-      echo "Swagger:   http://localhost:8080/swagger-ui/index.html"
+      echo "Swagger:   http://localhost:${API_PORT}/swagger-ui/index.html"
       [ -z "${NO_MINIO:-}" ] && echo "MinIO:     http://localhost:9001 (minioadmin / minioadmin)"
       return 0
     fi

@@ -9,7 +9,13 @@ Web gia phả nhiều dòng họ (nội + ngoại) dạng cây dọc, kéo/phón
 - `docker-compose.yml` — hạ tầng phát triển; `docker-compose.prod.yml` — triển khai thật
 - `docs/` — spec, kế hoạch, báo cáo, hướng dẫn vận hành
 
-## Chạy cục bộ
+## Chạy cục bộ bằng Docker (một lệnh)
+```bash
+./deploy.sh          # build + chạy Postgres, MinIO, backend, frontend → http://localhost:8088 (admin / password123)
+./deploy.sh help     # down | restart | reset | status | logs
+```
+
+## Chạy cục bộ để phát triển (không đóng gói)
 ```bash
 docker compose up -d
 # Backend (thư mục backend)
