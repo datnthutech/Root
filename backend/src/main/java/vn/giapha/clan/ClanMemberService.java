@@ -18,6 +18,15 @@ public class ClanMemberService {
     }
 
     @Transactional
+    public void rebuildClansOf(java.util.Collection<Long> personIds) {
+        if (personIds.isEmpty()) return;
+        List<Long> clanIds = jdbc.queryForList(
+            "SELECT DISTINCT clan_id FROM clan_member WHERE person_id = ANY(?) ORDER BY clan_id", Long.class,
+            (Object) personIds.toArray(Long[]::new));
+        for (long clanId : clanIds) rebuild(clanId);
+    }
+
+    @Transactional
     public int rebuild(long clanId) {
         Clan clan = clans.findById(clanId)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Không tìm thấy dòng họ"));
