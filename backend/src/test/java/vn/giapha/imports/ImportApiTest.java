@@ -70,9 +70,34 @@ class ImportApiTest {
 
     @Test
     void realImportSaves() throws Exception {
+        int before = jdbc.queryForObject("SELECT count(*) FROM person WHERE full_name LIKE 'Người API%'", Integer.class);
         mvc.perform(multipart(HttpMethod.POST, "/api/v1/import/excel").file(file(good())).param("dryRun", "false").header("Authorization", users.bearer(Role.ADMIN)))
            .andExpect(status().isOk()).andExpect(jsonPath("$.dryRun").value(false)).andExpect(jsonPath("$.errors.length()").value(0));
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM person WHERE full_name LIKE 'Người API%'", Integer.class)).isGreaterThanOrEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM person WHERE full_name LIKE 'Người API%'", Integer.class)).isEqualTo(before + 2);
+    }
+
+    @Test
+    void missingFilePartIs400() throws Exception {
+        mvc.perform(multipart(HttpMethod.POST, "/api/v1/import/excel").header("Authorization", users.bearer(Role.ADMIN)))
+           .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void nonMultipartIs415() throws Exception {
+        mvc.perform(post("/api/v1/import/excel").contentType("application/json").content("{}").header("Authorization", users.bearer(Role.ADMIN)))
+           .andExpect(status().isUnsupportedMediaType()).andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
+
+    @Test
+    void emptyFileIs400() throws Exception {
+        mvc.perform(multipart(HttpMethod.POST, "/api/v1/import/excel").file(file(new byte[0])).header("Authorization", users.bearer(Role.ADMIN)))
+           .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void badDryRunValueIs400() throws Exception {
+        mvc.perform(multipart(HttpMethod.POST, "/api/v1/import/excel").file(file(good())).param("dryRun", "abc").header("Authorization", users.bearer(Role.ADMIN)))
+           .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
 
     @Test

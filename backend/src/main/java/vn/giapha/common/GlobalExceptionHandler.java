@@ -33,7 +33,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
     ResponseEntity<ApiError> tooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException e) {
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(new ApiError("PAYLOAD_TOO_LARGE", "Tệp quá lớn (tối đa 5 MB)", null));
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(new ApiError("PAYLOAD_TOO_LARGE", "Tệp quá lớn (tối đa 6 MB)", null));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
@@ -50,5 +50,26 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiError> versionConflict(org.springframework.orm.ObjectOptimisticLockingFailureException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(new ApiError("VERSION_CONFLICT", "Dữ liệu đã được người khác sửa, vui lòng tải lại", null));
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    ResponseEntity<ApiError> missingPart(org.springframework.web.multipart.support.MissingServletRequestPartException e) {
+        return ResponseEntity.badRequest().body(new ApiError("VALIDATION_FAILED", "Thiếu tệp tải lên: " + e.getRequestPartName(), null));
+    }
+
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    ResponseEntity<ApiError> missingParam(org.springframework.web.bind.MissingServletRequestParameterException e) {
+        return ResponseEntity.badRequest().body(new ApiError("VALIDATION_FAILED", "Thiếu tham số: " + e.getParameterName(), null));
+    }
+
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiError> typeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException e) {
+        return ResponseEntity.badRequest().body(new ApiError("VALIDATION_FAILED", "Tham số không hợp lệ: " + e.getName(), null));
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ApiError> mediaType(org.springframework.web.HttpMediaTypeNotSupportedException e) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+            .body(new ApiError("UNSUPPORTED_MEDIA_TYPE", "Định dạng nội dung không được hỗ trợ", null));
     }
 }
