@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App as AntApp } from 'antd'
@@ -15,9 +15,23 @@ const profile = (over: Partial<PersonProfile> = {}): PersonProfile => ({
 function setup(props: Partial<React.ComponentProps<typeof PersonFormDrawer>> = {}) {
   const onSaved = vi.fn(), onClose = vi.fn()
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={qc}><AntApp><PersonFormDrawer open mode="create" onClose={onClose} onSaved={onSaved} {...props} /></AntApp></QueryClientProvider>)
-  return { onSaved, onClose }
+  const ui = (over: Partial<React.ComponentProps<typeof PersonFormDrawer>> = {}) => (
+    <QueryClientProvider client={qc}><AntApp><PersonFormDrawer open mode="create" onClose={onClose} onSaved={onSaved} {...props} {...over} /></AntApp></QueryClientProvider>
+  )
+  const { rerender } = render(ui())
+  return { onSaved, onClose, qc, reopen: (over: Partial<React.ComponentProps<typeof PersonFormDrawer>>) => rerender(ui(over)) }
 }
+
+async function pickPrecision(index: number, label: string) {
+  await userEvent.click(screen.getAllByRole('combobox')[index])
+  const dd = document.querySelector<HTMLElement>('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')!
+  await userEvent.click(within(dd).getByText(label))
+}
+async function typeDate(index: number, text: string) {
+  await userEvent.type(pickers()[index], text)
+  await userEvent.tab() // Enter sẽ submit form, nên commit bằng blur
+}
+const pickers = () => Array.from(document.querySelectorAll<HTMLInputElement>('.ant-picker input'))
 
 beforeEach(() => {
   vi.mocked(editApi.createPerson).mockReset()
@@ -59,7 +73,7 @@ test('xung đột phiên bản hiện thông báo và không đóng form', async
   vi.mocked(editApi.updatePerson).mockRejectedValue({ code: 'VERSION_CONFLICT', status: 409, message: '', details: null })
   const { onSaved } = setup({ mode: 'edit', person: profile() })
   await userEvent.click(await screen.findByRole('button', { name: 'Lưu' }))
-  expect((await screen.findAllByText(/người khác sửa/)).length).toBeGreaterThan(0)
+  expect(await screen.findByText('Dữ liệu đã được người khác sửa')).toBeInTheDocument()
   expect(onSaved).not.toHaveBeenCalled()
   expect(screen.getByLabelText('Họ và tên')).toBeInTheDocument()
 })
@@ -71,6 +85,8 @@ test('tải lại sau xung đột cập nhật version mới', async () => {
   await userEvent.click(await screen.findByRole('button', { name: 'Lưu' }))
   await userEvent.click(await screen.findByRole('button', { name: 'Tải lại dữ liệu mới nhất' }))
   expect(await screen.findByDisplayValue('Tên Mới Nhất')).toBeInTheDocument()
+  expect(screen.queryByText('Dữ liệu đã được người khác sửa')).not.toBeInTheDocument()
+  expect(personApi.biography).toHaveBeenCalledTimes(2)
   vi.mocked(editApi.updatePerson).mockResolvedValue(profile({ version: 8 }))
   await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
   await waitFor(() => expect(editApi.updatePerson).toHaveBeenLastCalledWith(5, expect.objectContaining({ version: 7 })))
@@ -95,20 +111,89 @@ test('tải biography lỗi thì không hiện form, thử lại được', asyn
   expect(editApi.updatePerson).not.toHaveBeenCalled()
 })
 
-test('độ chính xác Tháng gửi birthDate ngày 01 và bật Còn sống hiện ngày mất', async () => {
+test('độ chính xác Tháng gửi birthDate ngày 01', async () => {
   vi.mocked(editApi.createPerson).mockResolvedValue(profile())
   const { onSaved } = setup()
   await userEvent.type(screen.getByLabelText('Họ và tên'), 'Ai Đó')
-  await userEvent.click(screen.getAllByRole('combobox')[0])
-  await userEvent.click(await screen.findByText('Tháng'))
-  const picker = document.querySelector<HTMLInputElement>('.ant-picker input')!
-  await userEvent.type(picker, '04/1953{Enter}')
+  await pickPrecision(0, 'Tháng')
+  await typeDate(0, '04/1953')
+  await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+  await waitFor(() => expect(onSaved).toHaveBeenCalled())
+  expect(editApi.createPerson).toHaveBeenCalledWith(expect.objectContaining({ birthDate: '1953-04-01', birthPrecision: 'MONTH' }))
+}, 20000)
+
+test('chuyển còn sống sang đã mất gửi ngày mất, chuyển lại thì null', async () => {
+  vi.mocked(editApi.createPerson).mockResolvedValue(profile())
+  const { onSaved } = setup()
+  await userEvent.type(screen.getByLabelText('Họ và tên'), 'Ai Đó')
   expect(screen.queryByText('Ngày mất (dương lịch)')).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('switch'))
   expect(screen.getByText('Ngày mất (dương lịch)')).toBeInTheDocument()
+  await pickPrecision(1, 'Năm')
+  await typeDate(1, '1990')
   await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+  await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+  expect(editApi.createPerson).toHaveBeenLastCalledWith(expect.objectContaining({ alive: false, deathDate: '1990-01-01', deathPrecision: 'YEAR' }))
+  await userEvent.click(screen.getByRole('switch'))
+  await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+  await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
+  expect(editApi.createPerson).toHaveBeenLastCalledWith(expect.objectContaining({ alive: true, deathDate: null, deathPrecision: 'UNKNOWN' }))
+}, 30000)
+
+async function fillDates(birth: string, deathPrec: string, death: string) {
+  await userEvent.type(screen.getByLabelText('Họ và tên'), 'Ai Đó')
+  await pickPrecision(0, 'Ngày')
+  await typeDate(0, `${birth}`)
+  await userEvent.click(screen.getByRole('switch'))
+  await pickPrecision(1, deathPrec)
+  await typeDate(1, `${death}`)
+  await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+}
+
+test('ngày mất trước ngày sinh bị chặn', async () => {
+  setup()
+  await fillDates('15/06/1950', 'Ngày', '01/01/1940')
+  expect(await screen.findByText('Ngày mất không được trước ngày sinh')).toBeInTheDocument()
+  expect(editApi.createPerson).not.toHaveBeenCalled()
+}, 30000)
+
+test('mất năm 1950 so với sinh 15/06/1950 được chấp nhận', async () => {
+  vi.mocked(editApi.createPerson).mockResolvedValue(profile())
+  const { onSaved } = setup()
+  await fillDates('15/06/1950', 'Năm', '1950')
   await waitFor(() => expect(onSaved).toHaveBeenCalled())
-  expect(editApi.createPerson).toHaveBeenCalledWith(expect.objectContaining({ birthDate: '1953-04-01', birthPrecision: 'MONTH', alive: false }))
+}, 30000)
+
+test('ngày mất bằng ngày sinh được chấp nhận', async () => {
+  vi.mocked(editApi.createPerson).mockResolvedValue(profile())
+  const { onSaved } = setup()
+  await fillDates('15/06/1950', 'Ngày', '15/06/1950')
+  await waitFor(() => expect(onSaved).toHaveBeenCalled())
+}, 30000)
+
+test('refetch nền không làm mất nội dung đang gõ', async () => {
+  const { qc } = setup({ mode: 'edit', person: profile() })
+  const name = await screen.findByLabelText('Họ và tên')
+  await userEvent.clear(name)
+  await userEvent.type(name, 'Đang gõ dở')
+  await act(async () => { await qc.refetchQueries({ queryKey: ['person-bio'] }) })
+  expect(screen.getByLabelText('Họ và tên')).toHaveValue('Đang gõ dở')
+})
+
+test('mở lại với person mới thì bỏ trạng thái cũ', async () => {
+  vi.mocked(editApi.updatePerson).mockRejectedValueOnce({ code: 'VERSION_CONFLICT', status: 409, message: '', details: null })
+  vi.mocked(personApi.profile).mockResolvedValue(profile({ version: 7 }))
+  const { reopen, onSaved } = setup({ mode: 'edit', person: profile() })
+  await userEvent.click(await screen.findByRole('button', { name: 'Lưu' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Tải lại dữ liệu mới nhất' }))
+  await screen.findByRole('button', { name: 'Lưu' })
+  reopen({ open: false, mode: 'edit', person: profile() })
+  vi.mocked(editApi.updatePerson).mockResolvedValue(profile({ version: 12 }))
+  reopen({ open: true, mode: 'edit', person: profile({ version: 11 }) })
+  await userEvent.click(await screen.findByRole('button', { name: 'Lưu' }))
+  await waitFor(() => expect(onSaved).toHaveBeenCalled())
+  expect(editApi.updatePerson).toHaveBeenLastCalledWith(5, expect.objectContaining({ version: 11 }))
+  expect(screen.queryByText('Dữ liệu đã được người khác sửa')).not.toBeInTheDocument()
 }, 20000)
 
 test('bấm Lưu liên tiếp chỉ gửi một lần', async () => {

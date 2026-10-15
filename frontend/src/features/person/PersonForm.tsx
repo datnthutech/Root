@@ -3,7 +3,7 @@ import type { Rule } from 'antd/es/form'
 import { Button, DatePicker, Form, Input, Radio, Select, Space, Switch } from 'antd'
 import type { PersonProfile } from '../../api/person'
 import type { PersonInput } from '../../api/edit'
-import { fromIso, toIso, type Precision } from '../../lib/dateField'
+import { deathBeforeBirth, fromIso, toIso, type Precision } from '../../lib/dateField'
 import BioEditor from './BioEditor'
 
 const PRECISIONS = [{ value: 'DAY', label: 'Ngày' }, { value: 'MONTH', label: 'Tháng' }, { value: 'YEAR', label: 'Năm' }, { value: 'UNKNOWN', label: 'Không rõ' }]
@@ -16,7 +16,7 @@ function DateWithPrecision({ nameDate, namePrec, label, initialPrec, rules }: { 
     <Form.Item label={label}>
       <Space.Compact style={{ width: '100%' }}>
         <Form.Item name={namePrec} noStyle initialValue={initialPrec}><Select style={{ width: 110 }} options={PRECISIONS} /></Form.Item>
-        <Form.Item name={nameDate} noStyle rules={rules}>
+        <Form.Item name={nameDate} noStyle rules={rules} dependencies={rules ? ['birthDate', 'birthPrecision', namePrec] : undefined}>
           <DatePicker style={{ width: '100%' }} picker={pickerOf(prec)} disabled={prec === 'UNKNOWN'} format={prec === 'YEAR' ? 'YYYY' : prec === 'MONTH' ? 'MM/YYYY' : 'DD/MM/YYYY'} />
         </Form.Item>
       </Space.Compact>
@@ -33,9 +33,9 @@ export default function PersonForm({ initial, initialBiography = '', submitText 
 
   const deathAfterBirth: Rule = ({ getFieldValue }) => ({
     validator: (_, death) => {
-      const b = toIso(getFieldValue('birthDate'), getFieldValue('birthPrecision') ?? 'UNKNOWN')
-      const d = toIso(death, getFieldValue('deathPrecision') ?? 'UNKNOWN')
-      return b && d && d < b ? Promise.reject(new Error('Ngày mất không được trước ngày sinh')) : Promise.resolve()
+      const bp = (getFieldValue('birthPrecision') ?? 'UNKNOWN') as Precision
+      const dp = (getFieldValue('deathPrecision') ?? 'UNKNOWN') as Precision
+      return deathBeforeBirth(toIso(getFieldValue('birthDate'), bp), bp, toIso(death, dp), dp) ? Promise.reject(new Error('Ngày mất không được trước ngày sinh')) : Promise.resolve()
     },
   })
 

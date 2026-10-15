@@ -6,9 +6,14 @@ import { personApi, type PersonProfile } from '../../api/person'
 import { errorText } from '../../auth/errorText'
 import PersonForm from './PersonForm'
 
-export default function PersonFormDrawer({ open, mode, person, onClose, onSaved }: {
-  open: boolean; mode: 'create' | 'edit'; person?: PersonProfile; onClose(): void; onSaved(p: PersonProfile): void
-}) {
+type Props = { open: boolean; mode: 'create' | 'edit'; person?: PersonProfile; onClose(): void; onSaved(p: PersonProfile): void }
+
+/** Khoá theo người + trạng thái mở để mọi state nội bộ (fresh, conflict, reloading) được reset khi đổi. */
+export default function PersonFormDrawer(props: Props) {
+  return <DrawerInner key={`${props.person?.id ?? 'new'}-${props.open}`} {...props} />
+}
+
+function DrawerInner({ open, mode, person, onClose, onSaved }: Props) {
   const { message } = App.useApp()
   const qc = useQueryClient()
   const [busy, setBusy] = useState(false)
@@ -20,7 +25,7 @@ export default function PersonFormDrawer({ open, mode, person, onClose, onSaved 
   const bioKey = ['person-bio', person?.id]
   const bio = useQuery({
     queryKey: bioKey, queryFn: () => personApi.biography(person!.id),
-    enabled: open && mode === 'edit' && !!person, staleTime: 0, gcTime: 0, refetchOnMount: 'always',
+    enabled: open && mode === 'edit' && !!person, staleTime: 0, gcTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: false, refetchOnReconnect: false,
   })
 
   const submit = async (values: PersonInput) => {
@@ -54,11 +59,11 @@ export default function PersonFormDrawer({ open, mode, person, onClose, onSaved 
     }
   }
 
-  const formReady = mode === 'create' || (bio.isSuccess && !bio.isFetching && !reloading)
+  const formReady = mode === 'create' || (bio.data !== undefined && !reloading)
 
   return (
     <Drawer open={open} onClose={onClose} width="min(520px, 100vw)" destroyOnClose title={mode === 'create' ? 'Thêm người mới' : 'Sửa hồ sơ'}>
-      {mode === 'edit' && bio.isError && (
+      {mode === 'edit' && bio.isError && bio.data === undefined && (
         <Alert type="error" showIcon message="Không tải được sơ yếu lý lịch"
           action={<Button size="small" onClick={() => bio.refetch()}>Thử lại</Button>} />
       )}
