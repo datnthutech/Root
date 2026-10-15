@@ -14,8 +14,8 @@ export default function PersonDialog({ personId, onClose, onNavigate }: {
   const family = useQuery({ queryKey: ['person-family', personId], queryFn: () => personApi.family(personId!), enabled })
   const bio = useQuery({ queryKey: ['person-bio', personId], queryFn: () => personApi.biography(personId!), enabled })
 
-  const wrap = (q: { isLoading: boolean; error: unknown }, node: () => React.ReactNode) =>
-    q.isLoading ? <Spin /> : q.error ? <Alert type="error" message={errorText((q.error as { code?: string }).code)} /> : node()
+  const wrap = (q: { isLoading: boolean; error: unknown; data?: unknown }, node: () => React.ReactNode) =>
+    !enabled ? null : q.isLoading || (!q.error && q.data === undefined) ? <Spin /> : q.error ? <Alert type="error" message={errorText((q.error as { code?: string }).code)} /> : node()
 
   return (
     <Modal open={enabled} onCancel={onClose} footer={null} destroyOnClose width="min(720px, calc(100vw - 16px))" style={{ top: 8 }}
