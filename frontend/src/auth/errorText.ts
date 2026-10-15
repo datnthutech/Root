@@ -10,6 +10,7 @@ const TEXT: Record<string, string> = {
   RELATION_CYCLE: 'Quan hệ này tạo vòng lặp trong gia phả',
   RELATION_INVALID: 'Quan hệ không hợp lệ',
   NOT_FOUND: 'Không tìm thấy dữ liệu',
+  NOT_REVERTIBLE: 'Mục này không khôi phục được',
   EDIT_WINDOW_EXPIRED: 'Đã quá 24 giờ, chỉ quản trị viên được sửa',
 }
 export function errorText(code: string | undefined): string {

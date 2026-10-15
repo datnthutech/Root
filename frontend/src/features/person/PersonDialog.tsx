@@ -6,6 +6,7 @@ import { editApi } from '../../api/edit'
 import { errorText } from '../../auth/errorText'
 import { useAuth } from '../../auth/AuthContext'
 import { hasRole } from '../../auth/RequireAuth'
+import AuditTab from './AuditTab'
 import BioTab from './BioTab'
 import FamilyTab from './FamilyTab'
 import PersonFormDrawer from './PersonFormDrawer'
@@ -56,6 +57,10 @@ export default function PersonDialog({ personId, onClose, onNavigate, onTreeChan
             <FamilyTab f={family.data!} personId={personId!} personName={profile.data.fullName} personGender={profile.data.gender}
               canManage={hasRole(user, 'EDITOR')} onNavigate={onNavigate} onChanged={onChanged} />) : <Spin />)) },
           { key: 'bio', label: 'Sơ yếu lý lịch', children: wrap(bio, () => <BioTab text={bio.data!.biography} />) },
+          ...(hasRole(user, 'EDITOR') ? [{
+            key: 'history', label: 'Lịch sử sửa',
+            children: <AuditTab personId={personId!} canRevert={hasRole(user, 'ADMIN')} onReverted={onChanged} />,
+          }] : []),
         ]} />
       </Modal>
       {/* giữ person cuối cùng khi đóng để animation đóng không bị trống */}
