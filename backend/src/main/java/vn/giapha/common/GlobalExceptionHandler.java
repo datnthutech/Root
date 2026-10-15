@@ -40,4 +40,10 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiError> denied(AccessDeniedException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiError("FORBIDDEN", "Không đủ quyền", null));
     }
+
+    @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
+    ResponseEntity<ApiError> versionConflict(org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(new ApiError("VERSION_CONFLICT", "Dữ liệu đã được người khác sửa, vui lòng tải lại", null));
+    }
 }
