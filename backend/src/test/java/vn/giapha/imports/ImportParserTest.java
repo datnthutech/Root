@@ -102,4 +102,19 @@ class ImportParserTest {
         parse(new XlsxBuilder().sheet("Người", PEOPLE, List.of(p("P1", "x".repeat(201), "Nam", "1950", "Có", ""))));
         assertThat(errors).extracting(Error::code).containsExactly("TOO_LONG");
     }
+
+    @Test
+    void deathInSameYearAsDayPrecisionBirthIsAcceptedButEarlierYearRejected() {
+        parse(new XlsxBuilder().sheet("Người", PEOPLE, List.of(p("P1", "A", "Nam", "15/03/1950", "Không", "1950"))));
+        assertThat(errors).isEmpty();
+        parse(new XlsxBuilder().sheet("Người", PEOPLE, List.of(p("P1", "A", "Nam", "15/03/1950", "Không", "1949"))));
+        assertThat(errors).extracting(Error::code).contains("INCONSISTENT");
+    }
+
+    @Test
+    void nbspPaddedCellsParse() {
+        var parsed = parse(new XlsxBuilder().sheet("Người", PEOPLE, List.of(p("\u00A0P1\u00A0", "\u00A0Lê A\u00A0", "Nam", "\u00A01950\u00A0", "Không", ""))));
+        assertThat(errors).isEmpty();
+        assertThat(parsed.persons().get(0).fullName()).isEqualTo("Lê A");
+    }
 }

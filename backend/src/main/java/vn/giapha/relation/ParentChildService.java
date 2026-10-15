@@ -64,7 +64,8 @@ public class ParentChildService {
 
     private void checkBiologicalSlot(Person parent, List<ParentChild> existing) {
         List<Person> bioParents = existing.stream().filter(l -> l.getKind() == ParentKind.BIOLOGICAL)
-            .map(l -> persons.findById(l.getParentId()).orElseThrow(this::notFound)).toList();
+            .map(l -> persons.findById(l.getParentId()).orElseThrow(this::notFound))
+            .filter(p -> p.getDeletedAt() == null).toList();
         if (parent.getGender() == Gender.U) {
             if (bioParents.size() >= 2) throw invalid("Đã đủ cha và mẹ ruột");
             return;

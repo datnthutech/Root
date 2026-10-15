@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminUserController {
     public record CreateRequest(
         @NotBlank @Size(min = 3, max = 50) @Pattern(regexp = "[a-zA-Z0-9._-]+") String username,
-        @NotBlank @Size(min = 8, max = 72) String password,
+        @NotBlank @Size(min = 8) @vn.giapha.common.MaxUtf8Bytes String password,
         @Size(max = 120) String displayName, Role role, Long linkedPersonId) {}
     public record UpdateRequest(@Size(max = 120) String displayName, Role role, UserStatus status, Long linkedPersonId) {}
 

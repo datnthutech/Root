@@ -90,4 +90,11 @@ class AdminUserApiTest {
         mvc.perform(put("/api/v1/admin/users/99999999").header("Authorization", tu.bearer(Role.ADMIN))
             .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"VIEWER\"}")).andExpect(status().isNotFound());
     }
+
+    @Test
+    void createRejectsMultibytePasswordOver72Bytes() throws Exception {
+        mvc.perform(post("/api/v1/admin/users").header("Authorization", tu.bearer(Role.ADMIN)).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"username\":\"u" + System.nanoTime() + "\",\"password\":\"" + "ệ".repeat(30) + "\"}"))
+           .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
 }

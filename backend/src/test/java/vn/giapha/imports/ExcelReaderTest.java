@@ -96,4 +96,10 @@ class ExcelReaderTest {
         byte[] x = new XlsxBuilder().sheet("Người", List.of("Mã", "Tên", "Tên"), List.of(Arrays.asList("P1", "first", "second"))).bytes();
         assertThat(ExcelReader.read(new ByteArrayInputStream(x)).get("nguoi").rows().get(0).cells().get("ten")).isEqualTo("second");
     }
+
+    @Test
+    void nbspPaddedCellsAreStripped() {
+        byte[] x = new XlsxBuilder().sheet("Người", List.of("Mã", "Họ và tên"), List.of(Arrays.asList("P1", "\u00A0Nguyễn A\u00A0"))).bytes();
+        assertThat(ExcelReader.read(new ByteArrayInputStream(x)).get("nguoi").rows().get(0).cells().get("hovaten")).isEqualTo("Nguyễn A");
+    }
 }

@@ -90,17 +90,19 @@ public final class ExcelReader {
             if (type == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
                 return cell.getLocalDateTimeCellValue().toLocalDate().toString();
             }
-            return fmt.formatCellValue(cell, ev).trim();
+            return clean(fmt.formatCellValue(cell, ev));
         } catch (Exception e) {
             return "";
         }
     }
 
+    private static String clean(String s) { return s.replace('\u00A0', ' ').strip(); }
+
     private static String cachedValue(Cell cell, DataFormatter fmt) {
         try {
             return switch (cell.getCachedFormulaResultType()) {
-                case STRING -> cell.getStringCellValue().trim();
-                case NUMERIC -> fmt.formatCellValue(cell).trim();
+                case STRING -> clean(cell.getStringCellValue());
+                case NUMERIC -> clean(fmt.formatCellValue(cell));
                 case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
                 default -> "";
             };

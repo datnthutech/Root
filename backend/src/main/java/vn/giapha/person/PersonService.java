@@ -118,7 +118,7 @@ public class PersonService {
     private void apply(Person p, PersonInput in) {
         boolean alive = in.alive() == null || in.alive();
         if (alive && in.deathDate() != null) throw bad("Người còn sống không có ngày mất");
-        if (in.birthDate() != null && in.deathDate() != null && in.deathDate().isBefore(in.birthDate())) throw bad("Ngày mất trước ngày sinh");
+        if (DateConsistency.deathBeforeBirth(in.birthDate(), in.birthPrecision(), in.deathDate(), in.deathPrecision())) throw bad("Ngày mất trước ngày sinh");
         p.setFullName(in.fullName().trim());
         p.setNickname(blank(in.nickname()));
         p.setGender(in.gender());

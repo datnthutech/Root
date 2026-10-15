@@ -115,12 +115,13 @@ public class FamilyService {
             (k == Kind.FULL ? full : k == Kind.HALF_SAME_FATHER ? halfF : halfM).add(sid);
         }
 
-        Set<Long> unionIds = unionRows.stream().map(UnionRow::id).collect(Collectors.toSet());
+        Set<Long> unionIds = new HashSet<>();
         List<SpouseFamily> spouses = new ArrayList<>();
         for (UnionRow u : unionRows) {
             PersonRef partner = ref.apply(u.partnerId(), none);
             if (partner == null) continue;
             List<Long> kids = childLinks.stream().filter(c -> Objects.equals(c.unionId(), u.id())).map(ChildLink::childId).toList();
+            unionIds.add(u.id());
             spouses.add(new SpouseFamily(u.id(), u.order(), u.status(), u.start(), u.end(), partner, refs.apply(kids, childLinkId)));
         }
         List<Long> other = childLinks.stream().filter(c -> c.unionId() == null || !unionIds.contains(c.unionId()))

@@ -91,9 +91,15 @@ class RevertRollbackTest {
         mvc.perform(delete("/api/v1/relations/unions/" + uid).header("Authorization", a)).andExpect(status().isNoContent());
         long delAudit = count("SELECT id FROM audit_log WHERE entity_type='UNION' AND action='DELETE' AND entity_id=?", uid);
         // làm bước dựng lại clan_member (sau khi union đã tạo và dòng REVERT đã ghi) thất bại
-        jdbc.update("UPDATE clan SET founder_person_id = NULL WHERE id=?", ids.clan());
+        jdbc.execute("CREATE FUNCTION fail_clan_member() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'boom'; END $$");
+        jdbc.execute("CREATE TRIGGER fail_clan_member BEFORE INSERT OR DELETE ON clan_member FOR EACH ROW EXECUTE FUNCTION fail_clan_member()");
         long audits = count("SELECT count(*) FROM audit_log");
-        mvc.perform(post("/api/v1/audit/" + delAudit + "/revert").header("Authorization", a)).andExpect(status().isConflict());
+        try {
+            mvc.perform(post("/api/v1/audit/" + delAudit + "/revert").header("Authorization", a)).andExpect(status().isInternalServerError());
+        } finally {
+            jdbc.execute("DROP TRIGGER fail_clan_member ON clan_member");
+            jdbc.execute("DROP FUNCTION fail_clan_member()");
+        }
         assertThat(count("SELECT count(*) FROM union_rel WHERE partner_a_id=? AND partner_b_id=?", ids.c(), wife)).isZero();
         assertThat(count("SELECT count(*) FROM audit_log")).isEqualTo(audits);
         assertThat(count("SELECT count(*) FROM audit_log WHERE action='REVERT'")).isZero();

@@ -44,4 +44,13 @@ class ClanMemberServiceTest {
         assertThat(byPerson.get(kid.getId()).getGeneration()).isEqualTo(2);
         assertThat(byPerson).doesNotContainKey(softDeleted.getId());
     }
+
+    @Test
+    void rebuildClansOfSkipsClansWithoutFounder() {
+        Person root = p("Tổ");
+        Clan c = new Clan(); c.setName("Họ"); c.setFounderPersonId(root.getId()); c = clans.save(c);
+        service.rebuild(c.getId());
+        c.setFounderPersonId(null); clans.saveAndFlush(c);
+        service.rebuildClansOf(java.util.List.of(root.getId()));   // không được ném RELATION_INVALID
+    }
 }

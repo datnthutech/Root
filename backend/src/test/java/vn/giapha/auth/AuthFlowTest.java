@@ -120,4 +120,13 @@ class AuthFlowTest {
         users.save(x);
         assertThat(login(u, "password123").getResponse().getStatus()).isEqualTo(423);
     }
+
+    @Test
+    void multibytePasswordOver72BytesIsRejected() throws Exception {
+        String pw = "ệ".repeat(30);   // 30 ký tự nhưng 90 byte UTF-8
+        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"username\":\"" + name() + "\",\"password\":\"" + pw + "\"}"))
+           .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+           .andExpect(jsonPath("$.details.password").exists());
+    }
 }

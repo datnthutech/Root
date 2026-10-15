@@ -71,4 +71,16 @@ class ClanAdminApiTest {
             .content("{\"name\":\"X\",\"founderPersonId\":99999999}")).andExpect(status().isBadRequest());
         mvc.perform(put("/api/v1/admin/clans/99999999").header("Authorization", admin).contentType(JSON).content("{\"name\":\"X\"}")).andExpect(status().isNotFound());
     }
+
+    @Test
+    void clearingFounderDeletesMembership() throws Exception {
+        var ids = fixture.create();
+        String admin = users.bearer(Role.ADMIN);
+        mvc.perform(put("/api/v1/admin/clans/" + ids.clan()).header("Authorization", admin).contentType(JSON)
+            .content("{\"name\":\"Họ Nguyễn\",\"founderPersonId\":" + ids.a() + "}")).andExpect(status().isOk());
+        assertThat(members.findByClanId(ids.clan())).isNotEmpty();
+        mvc.perform(put("/api/v1/admin/clans/" + ids.clan()).header("Authorization", admin).contentType(JSON)
+            .content("{\"name\":\"Họ Nguyễn\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.memberCount").value(0));
+        assertThat(members.findByClanId(ids.clan())).isEmpty();
+    }
 }

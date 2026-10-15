@@ -103,4 +103,12 @@ class ParentChildServiceTest {
         service.remove(id);
         assertThat(links.findById(id)).isEmpty();
     }
+
+    @Test
+    void softDeletedBiologicalFatherDoesNotOccupyTheSlot() {
+        Person oldDad = p("Cha cũ", Gender.M, 1920), newDad = p("Cha mới", Gender.M, 1921), kid = p("Con", Gender.M, 1950);
+        service.add(oldDad.getId(), kid.getId(), null, null);
+        oldDad.setDeletedAt(java.time.Instant.now()); persons.saveAndFlush(oldDad);
+        assertThat(service.add(newDad.getId(), kid.getId(), null, null).link().getKind()).isEqualTo(ParentKind.BIOLOGICAL);
+    }
 }

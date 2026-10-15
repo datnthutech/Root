@@ -19,7 +19,7 @@ public class AuthController {
 
     public record RegisterRequest(
         @NotBlank @Size(min = 3, max = 50) @Pattern(regexp = "[a-zA-Z0-9._-]+") String username,
-        @NotBlank @Size(min = 8, max = 72) String password,
+        @NotBlank @Size(min = 8) @vn.giapha.common.MaxUtf8Bytes String password,
         @Size(max = 120) String displayName) {}
     public record LoginRequest(@NotBlank String username, @NotBlank String password) {}
     public record RegisterResponse(long id, UserStatus status) {}

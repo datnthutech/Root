@@ -41,6 +41,7 @@ public class ClanAdminService {
         apply(c, name, founderId, description, mode, useUt);
         c = clans.saveAndFlush(c);
         if (c.getFounderPersonId() != null) memberService.rebuild(c.getId());
+        else members.deleteByClanId(c.getId());
         return view(c);
     }
 

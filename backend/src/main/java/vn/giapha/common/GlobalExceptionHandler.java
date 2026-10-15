@@ -13,6 +13,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ApiError> api(ApiException e) {
@@ -71,5 +72,30 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiError> mediaType(org.springframework.web.HttpMediaTypeNotSupportedException e) {
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
             .body(new ApiError("UNSUPPORTED_MEDIA_TYPE", "Định dạng nội dung không được hỗ trợ", null));
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    ResponseEntity<ApiError> integrity(org.springframework.dao.DataIntegrityViolationException e) {
+        log.warn("Vi phạm ràng buộc dữ liệu", e);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(new ApiError("CONFLICT", "Dữ liệu xung đột với dữ liệu hiện có, vui lòng tải lại và thử lại", null));
+    }
+
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    ResponseEntity<ApiError> unauthenticated(org.springframework.security.core.AuthenticationException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).header("WWW-Authenticate", "Bearer")
+            .body(new ApiError("UNAUTHENTICATED", "Cần đăng nhập", null));
+    }
+
+    /** Lưới an toàn cuối cùng: lỗi bất ngờ trả 500 JSON thay vì rơi vào ERROR dispatch. */
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<ApiError> unexpected(Exception e) {
+        if (e instanceof org.springframework.web.ErrorResponse er) {   // lỗi 4xx/5xx chuẩn của Spring MVC giữ nguyên status
+            return ResponseEntity.status(er.getStatusCode())
+                .body(new ApiError("HTTP_" + er.getStatusCode().value(), "Yêu cầu không hợp lệ", null));
+        }
+        log.error("Lỗi không mong đợi", e);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(new ApiError("INTERNAL", "Đã xảy ra lỗi hệ thống, vui lòng thử lại sau", null));
     }
 }

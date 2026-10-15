@@ -26,7 +26,11 @@ public class ClanMemberService {
         List<Long> clanIds = jdbc.queryForList(
             "SELECT DISTINCT clan_id FROM clan_member WHERE person_id = ANY(?) ORDER BY clan_id", Long.class,
             (Object) personIds.toArray(Long[]::new));
-        for (long clanId : clanIds) if (excludeClanId == null || clanId != excludeClanId) rebuild(clanId);
+        for (long clanId : clanIds) {
+            if (excludeClanId != null && clanId == excludeClanId) continue;
+            boolean hasFounder = clans.findById(clanId).map(c -> c.getFounderPersonId() != null).orElse(false);
+            if (hasFounder) rebuild(clanId);
+        }
     }
 
     @Transactional

@@ -48,7 +48,8 @@ public final class ImportParser {
             Boolean aliveCell = guard(errors, S_PEOPLE, r, "Còn sống", () -> Cells.bool(cell(r, "consong")));
             boolean alive = aliveCell != null ? aliveCell : death == null;
             if (alive && death != null) errors.add(err(S_PEOPLE, r, "Còn sống", "INCONSISTENT", "Còn sống nhưng có ngày mất"));
-            if (birth != null && death != null && death.date().isBefore(birth.date())) {
+            if (birth != null && death != null
+                && vn.giapha.person.DateConsistency.deathBeforeBirth(birth.date(), birth.precision(), death.date(), death.precision())) {
                 errors.add(err(S_PEOPLE, r, "Ngày mất", "INCONSISTENT", "Ngày mất trước ngày sinh"));
             }
             if (errors.size() == before && gender != null) {
@@ -147,7 +148,7 @@ public final class ImportParser {
         if (v.length() > max) errors.add(err(sheet, r, col, "TOO_LONG", col + " dài quá " + max + " ký tự"));
     }
 
-    private static String cell(ExcelReader.Row r, String key) { return r.cells().getOrDefault(key, "").trim(); }
+    private static String cell(ExcelReader.Row r, String key) { return r.cells().getOrDefault(key, "").replace('\u00A0', ' ').strip(); }
     private static String blank(String s) { return s.isEmpty() ? null : s; }
     private static Error err(String sheet, ExcelReader.Row r, String col, String code, String msg) { return new Error(sheet, r.number(), col, code, msg); }
 }

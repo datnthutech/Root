@@ -171,4 +171,16 @@ class PersonEditApiTest {
         mvc.perform(put("/api/v1/persons/99999999").header("Authorization", users.bearer(Role.ADMIN)).contentType(MediaType.APPLICATION_JSON)
             .content("{\"fullName\":\"X\",\"gender\":\"M\",\"version\":0}")).andExpect(status().isNotFound());
     }
+
+    @Test
+    void coarseDatePrecisionIsComparedAtTheCoarserLevel() throws Exception {
+        String auth = users.bearer(Role.EDITOR);
+        String ok = "{\"fullName\":\"A\",\"gender\":\"M\",\"alive\":false,\"birthDate\":\"1950-03-15\",\"birthPrecision\":\"DAY\","
+            + "\"deathDate\":\"1950-01-01\",\"deathPrecision\":\"YEAR\"}";
+        mvc.perform(post("/api/v1/persons").header("Authorization", auth).contentType(MediaType.APPLICATION_JSON).content(ok))
+           .andExpect(status().isCreated());
+        String bad = ok.replace("\"deathDate\":\"1950-01-01\"", "\"deathDate\":\"1949-01-01\"");
+        mvc.perform(post("/api/v1/persons").header("Authorization", auth).contentType(MediaType.APPLICATION_JSON).content(bad))
+           .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
 }
