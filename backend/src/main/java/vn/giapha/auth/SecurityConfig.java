@@ -3,6 +3,7 @@ package vn.giapha.auth;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
@@ -28,7 +29,14 @@ public class SecurityConfig {
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout",
                     "/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/v1/admin/**", "/api/v1/import/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/audit/*/revert").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/v1/audit").hasAnyRole("EDITOR", "ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/persons/*").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/v1/persons/*", "/api/v1/persons/*/photo").hasAnyRole("EDITOR", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/persons", "/api/v1/relations/**").hasAnyRole("EDITOR", "ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/v1/persons/*/birth-order", "/api/v1/relations/**").hasAnyRole("EDITOR", "ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/relations/**").hasAnyRole("EDITOR", "ADMIN")
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((req, res, ex) -> write(om, res, 401, new ApiError("UNAUTHENTICATED", "Cần đăng nhập", null)))
