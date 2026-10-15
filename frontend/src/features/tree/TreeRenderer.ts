@@ -6,6 +6,7 @@ import { QuadTree } from '../../lib/quadtree'
 import { lodForScale, type Lod } from '../../lib/lod'
 import { lifespan, truncate } from '../../lib/format'
 import type { PhotoStore } from '../../lib/photoStore'
+import { anchorShift } from '../../lib/anchorShift'
 
 export interface ViewInfo { x: number; y: number; w: number; h: number; scale: number }
 export interface RendererHandlers {
@@ -89,6 +90,7 @@ export class TreeRenderer {
   private dirty = true
   private hoverId: number | null = null
   private selectedId: number | null = null
+  private anchorId: number | null = null // nút +/- vừa bấm
 
   constructor(private canvas: HTMLCanvasElement, private handlers: RendererHandlers = {}) {
     this.app = new Application({
@@ -126,7 +128,7 @@ export class TreeRenderer {
       if (!hit) return
       const n = this.nodes.get(hit.id)!
       const onToggle = this.lod !== 'dot' && n.hasKids && e.world.y > n.y + n.h - 4 && Math.abs(e.world.x - (n.x + n.w / 2)) <= 12
-      if (onToggle) this.handlers.onToggle?.(hit.id)
+      if (onToggle) { this.anchorId = hit.id; this.handlers.onToggle?.(hit.id) }
       else this.handlers.onClick?.(hit.id, { x: e.screen.x, y: e.screen.y })
     })
   }
@@ -141,6 +143,7 @@ export class TreeRenderer {
   setData(graph: GraphData, layout: LayoutResult, opts: { keepCamera?: boolean } = {}): void {
     const center = this.viewport.center.clone()
     const scale = this.viewport.scale.x
+    const oldAnchor = this.anchorId !== null ? this.nodes.get(this.anchorId) : undefined
     this.persons = new Map(graph.persons.map((p) => [p.id, p]))
     this.nodes = new Map(layout.nodes.map((n) => [n.id, n]))
     this.releaseAll()
@@ -165,8 +168,13 @@ export class TreeRenderer {
     this.drawHalo()
 
     this.viewport.resize(this.app.screen.width, this.app.screen.height, layout.width, layout.height)
-    if (opts.keepCamera) { this.viewport.setZoom(scale, true); this.viewport.moveCenter(center.x, center.y) }
+    if (opts.keepCamera) {
+      // giữ nút vừa bấm +/- đứng yên trên màn hình dù bố cục co/giãn
+      const { dx, dy } = anchorShift(oldAnchor, this.anchorId !== null ? this.nodes.get(this.anchorId) : undefined)
+      this.viewport.setZoom(scale, true); this.viewport.moveCenter(center.x + dx, center.y + dy)
+    }
     else this.fit()
+    this.anchorId = null
     this.dirty = true
   }
 

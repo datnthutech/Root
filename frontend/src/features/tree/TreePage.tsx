@@ -56,7 +56,8 @@ export default function TreePage() {
 
   const goTo = (id: number) => {
     setDialogId(null)
-    if (data.graph?.persons.some((p) => p.id === id)) { setSelected(id); canvas.current?.focusOn(id, 1); return }
+    // chỉ bay camera khi nút đang hiện trong bố cục (người nằm dưới nhánh thu gọn thì chuyển sang chế độ tập trung)
+    if (data.layout?.nodes.some((n) => n.id === id)) { setSelected(id); canvas.current?.focusOn(id, 1); return }
     pendingFocus.current = id
     update({ mode: 'focus', clanId: null, side: 'both', personId: id, up: params?.up ?? 3, down: params?.down ?? 3 })
   }
