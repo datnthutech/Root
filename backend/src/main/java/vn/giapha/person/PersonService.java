@@ -53,20 +53,67 @@ public class PersonService {
     }
 
     @Transactional
-    public void delete(AuthUser me, long id) {
+    public void delete(AuthUser me, long id) { softDelete(me, id, "DELETE"); }
+
+    @Transactional
+    public void softDelete(AuthUser me, long id, String auditAction) {
         Person p = persons.findByIdAndDeletedAtIsNull(id).orElseThrow(this::notFound);
         Integer founders = jdbc.queryForObject("SELECT count(*) FROM clan WHERE founder_person_id = ?", Integer.class, id);
         if (founders != null && founders > 0) {
             throw new ApiException(HttpStatus.CONFLICT, "RELATION_INVALID", "Không thể xoá thủy tổ của một dòng họ");
         }
-        List<Long> affected = List.of(id);
         var before = Snapshots.of(p);
         p.setDeletedAt(java.time.Instant.now());
         persons.saveAndFlush(p);
         jdbc.update("UPDATE app_user SET linked_person_id = NULL WHERE linked_person_id = ?", id);
-        clanMembers.rebuildClansOf(affected);   // chạy khi người còn trong clan_member để biết dòng họ nào cần dựng lại
-        audit.record(me.id(), "PERSON", id, "DELETE", before, Snapshots.of(p));
+        clanMembers.rebuildClansOf(List.of(id));
+        audit.record(me.id(), "PERSON", id, auditAction, before, Snapshots.of(p));
     }
+
+    @Transactional
+    public void restore(AuthUser me, long id) {
+        Person p = persons.findById(id).orElseThrow(this::notFound);
+        if (p.getDeletedAt() == null) throw new ApiException(HttpStatus.CONFLICT, "NOT_REVERTIBLE", "Người này chưa bị xoá");
+        var before = Snapshots.of(p);
+        p.setDeletedAt(null);
+        persons.saveAndFlush(p);
+        List<Long> related = new java.util.ArrayList<>(jdbc.queryForList("""
+            SELECT parent_id FROM parent_child WHERE child_id = ?
+            UNION SELECT child_id FROM parent_child WHERE parent_id = ?
+            UNION SELECT CASE WHEN partner_a_id = ? THEN partner_b_id ELSE partner_a_id END FROM union_rel WHERE partner_a_id = ? OR partner_b_id = ?
+            """, Long.class, id, id, id, id, id));
+        related.add(id);
+        clanMembers.rebuildClansOf(related);
+        audit.record(me.id(), "PERSON", id, "REVERT", before, Snapshots.of(p));
+    }
+
+    @Transactional
+    public Person applyHistory(AuthUser me, long id, com.fasterxml.jackson.databind.JsonNode snap) {
+        Person p = persons.findById(id).orElseThrow(this::notFound);
+        if (p.getDeletedAt() != null) throw new ApiException(HttpStatus.CONFLICT, "NOT_REVERTIBLE", "Người này đã bị xoá");
+        var before = Snapshots.of(p);
+        p.setFullName(text(snap, "fullName") == null ? p.getFullName() : text(snap, "fullName"));
+        p.setNickname(text(snap, "nickname"));
+        if (text(snap, "gender") != null) p.setGender(Gender.valueOf(text(snap, "gender")));
+        p.setBirthDate(date(snap, "birthDate"));
+        if (text(snap, "birthPrecision") != null) p.setBirthPrecision(DatePrecision.valueOf(text(snap, "birthPrecision")));
+        p.setBirthLunar(text(snap, "birthLunar"));
+        p.setDeathDate(date(snap, "deathDate"));
+        if (text(snap, "deathPrecision") != null) p.setDeathPrecision(DatePrecision.valueOf(text(snap, "deathPrecision")));
+        p.setDeathAnniversaryLunar(text(snap, "deathAnniversaryLunar"));
+        if (snap.has("alive")) p.setAlive(snap.get("alive").asBoolean());
+        p.setOriginPlace(text(snap, "originPlace"));
+        p.setHomePlace(text(snap, "homePlace"));
+        p.setBurialPlace(text(snap, "burialPlace"));
+        p.setBiography(text(snap, "biography"));
+        p.setBirthOrderOverride(snap.hasNonNull("birthOrderOverride") ? snap.get("birthOrderOverride").asInt() : null);
+        p = persons.saveAndFlush(p);
+        audit.record(me.id(), "PERSON", id, "REVERT", before, Snapshots.of(p));
+        return p;
+    }
+
+    private static String text(com.fasterxml.jackson.databind.JsonNode n, String f) { return n.hasNonNull(f) ? n.get(f).asText() : null; }
+    private static java.time.LocalDate date(com.fasterxml.jackson.databind.JsonNode n, String f) { return n.hasNonNull(f) ? java.time.LocalDate.parse(n.get(f).asText()) : null; }
 
     private void apply(Person p, PersonInput in) {
         boolean alive = in.alive() == null || in.alive();

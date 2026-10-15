@@ -59,6 +59,7 @@ public class ParentChildService {
     public void remove(long linkId) {
         if (!links.existsById(linkId)) throw notFound();
         links.deleteById(linkId);
+        links.flush();   // JDBC queries (cycle check, clan_member rebuild) must see the removal immediately
     }
 
     private void checkBiologicalSlot(Person parent, List<ParentChild> existing) {

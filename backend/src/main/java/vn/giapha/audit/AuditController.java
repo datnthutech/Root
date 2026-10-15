@@ -13,8 +13,9 @@ import vn.giapha.common.ApiException;
 @RequestMapping("/api/v1/audit")
 public class AuditController {
     private final AuditQueryService query;
+    private final RevertService revert;
 
-    public AuditController(AuditQueryService query) { this.query = query; }
+    public AuditController(AuditQueryService query, RevertService revert) { this.query = query; this.revert = revert; }
 
     @GetMapping
     @PreAuthorize("hasRole('EDITOR')")
@@ -26,4 +27,9 @@ public class AuditController {
         }
         return query.forPerson(entityId, beforeId, limit);
     }
+
+    @PostMapping("/{id}/revert")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revert(@AuthenticationPrincipal AuthUser me, @PathVariable long id) { revert.revert(me, id); }
 }
