@@ -27,3 +27,16 @@ test('StrictMode: một canvas sống, renderer đầu bị destroy', () => {
   expect(instances[instances.length - 1].canvas.isConnected).toBe(true)
   expect(container.querySelector('canvas')).toBe(instances[instances.length - 1].canvas)
 })
+
+test('đặt data-tree-ready = số nút sau setData và xoá khi unmount', () => {
+  const noop = () => {}
+  const graph = { nodes: [] } as never
+  const layout = { nodes: [{}, {}, {}] } as never
+  const { unmount } = render(
+    <TreeCanvas graph={graph} layout={layout} keepCamera={false} selectedId={null}
+      onHover={noop} onClick={noop} onToggle={noop} onViewChange={noop} />,
+  )
+  expect(document.documentElement.dataset.treeReady).toBe('3')
+  unmount()
+  expect(document.documentElement.dataset.treeReady).toBeUndefined()
+})

@@ -50,6 +50,7 @@ export default function PersonDialog({ personId, onClose, onNavigate, onTreeChan
     <>
       <Modal open={enabled} onCancel={close} footer={null} destroyOnClose width="min(720px, calc(100vw - 16px))" style={{ top: 8 }}
         title="Thông tin">
+        <div data-person-ready={profile.data ? '1' : '0'}>
         <Tabs items={[
           { key: 'profile', label: 'Hồ sơ', children: wrap(profile, () => (
             <ProfileTab p={profile.data!} canOrder={hasRole(user, 'EDITOR')} isAdmin={hasRole(user, 'ADMIN')}
@@ -63,6 +64,7 @@ export default function PersonDialog({ personId, onClose, onNavigate, onTreeChan
             children: <AuditTab personId={personId!} canRevert={hasRole(user, 'ADMIN')} onReverted={onChanged} />,
           }] : []),
         ]} />
+        </div>
       </Modal>
       {/* giữ person cuối cùng khi đóng để animation đóng không bị trống */}
       {profile.data && (

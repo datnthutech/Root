@@ -50,11 +50,14 @@ export const TreeCanvas = forwardRef<TreeCanvasHandle, Props>(function TreeCanva
     const p = propsRef.current
     if (p.graph && p.layout) r.setData(p.graph, p.layout, { keepCamera: false })
     r.setSelected(p.selectedId)
-    return () => { photos.destroy(); r.destroy(); rendererRef.current = null; canvas.remove() }
+    return () => { photos.destroy(); r.destroy(); rendererRef.current = null; canvas.remove(); delete document.documentElement.dataset.treeReady }
   }, [])
 
   useEffect(() => {
-    if (props.graph && props.layout) rendererRef.current?.setData(props.graph, props.layout, { keepCamera: props.keepCamera })
+    if (props.graph && props.layout) {
+      rendererRef.current?.setData(props.graph, props.layout, { keepCamera: props.keepCamera })
+      document.documentElement.dataset.treeReady = String(props.layout.nodes.length)
+    }
   }, [props.graph, props.layout, props.keepCamera])
 
   useEffect(() => { rendererRef.current?.setSelected(props.selectedId) }, [props.selectedId, props.layout])

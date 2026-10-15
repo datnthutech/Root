@@ -134,3 +134,9 @@ test('ADMIN thấy tab Lịch sử sửa và nút Khôi phục', async () => {
   await userEvent.click(screen.getByRole('tab', { name: 'Lịch sử sửa' }))
   expect(await screen.findByRole('button', { name: 'Khôi phục' })).toBeInTheDocument()
 })
+
+test('đánh dấu data-person-ready=1 khi hồ sơ đã tải', async () => {
+  setup()
+  await screen.findByText('Nguyễn Văn An')
+  await waitFor(() => expect(document.querySelector('[data-person-ready="1"]')).not.toBeNull())
+})
