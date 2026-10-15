@@ -63,7 +63,8 @@ case "$cmd" in
     require_docker
     scale=()
     [ -n "${NO_MINIO:-}" ] && scale=(--scale minio=0)
-    "${COMPOSE[@]}" up -d --build "${scale[@]}"
+    # ${scale[@]+...}: bash 3.2 (macOS) coi mảng rỗng là unbound khi bật set -u
+    "${COMPOSE[@]}" up -d --build ${scale[@]+"${scale[@]}"}
     wait_ready
     ;;
   down)
