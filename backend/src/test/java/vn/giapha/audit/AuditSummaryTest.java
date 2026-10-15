@@ -82,4 +82,10 @@ class AuditSummaryTest {
         assertThat(AuditSummary.revertible("UNION", "UPDATE")).isTrue();
         assertThat(AuditSummary.revertible("CLAN", "CREATE")).isFalse();
     }
+
+    @Test
+    void importSummary() throws Exception {
+        assertThat(AuditSummary.summary("IMPORT", "IMPORT", null, j("{\"persons\":4,\"unions\":1,\"links\":3}"), NAMES::get))
+            .isEqualTo("Nhập Excel: 4 người, 1 hôn phối, 3 quan hệ");
+    }
 }

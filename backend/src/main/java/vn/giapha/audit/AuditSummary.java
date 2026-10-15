@@ -78,6 +78,11 @@ public final class AuditSummary {
                     default -> "Thêm hôn phối: " + pair;
                 };
             }
+            case "IMPORT": {
+                JsonNode a = after == null ? before : after;
+                return "Nhập Excel: " + (a == null ? 0 : a.path("persons").asInt()) + " người, "
+                    + (a == null ? 0 : a.path("unions").asInt()) + " hôn phối, " + (a == null ? 0 : a.path("links").asInt()) + " quan hệ";
+            }
             default: return action + " " + entityType;
         }
     }
