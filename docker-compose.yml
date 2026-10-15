@@ -14,13 +14,14 @@ services:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U giapha -d giapha"]
       interval: 5s
       retries: 20
+  # Kho ảnh tương thích S3. Dùng RustFS vì minio/minio đã bị gỡ khỏi Docker Hub.
+  # Giữ tên service "minio" để backend/biến MINIO_* không phải đổi.
   minio:
-    image: minio/minio:latest
+    image: rustfs/rustfs:latest
     restart: unless-stopped
-    command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      RUSTFS_ACCESS_KEY: minioadmin
+      RUSTFS_SECRET_KEY: minioadmin
     ports: ["127.0.0.1:${MINIO_PORT:-7001}:9001"]
     volumes: ["miniodata:/data"]
   backend:
@@ -55,7 +56,7 @@ services:
     environment:
       # ":80" = HTTP thuần, không tự bật HTTPS/redirect (chỉ dùng local)
       DOMAIN: ":80"
-    ports: ["127.0.0.1:${WEB_PORT:-7000}:80"]
+    ports: ["127.0.0.1:${WEB_PORT:-7070}:80"]
 volumes:
   pgdata:
   miniodata:

@@ -3,7 +3,7 @@
 // ok = coldTreeMs < TREE_MS && popupMs < POPUP_MS && treeNodes >= MIN_NODES. warmTreeMs chỉ để tham khảo, KHÔNG ảnh hưởng ok.
 import { chromium } from 'playwright'
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:7000'
+const BASE = process.env.BASE_URL ?? 'http://localhost:7070'
 const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(BASE)
 if (!isLocal && !(process.env.E2E_USER && process.env.E2E_PASS)) {
   console.error('E2E_USER và E2E_PASS là bắt buộc khi BASE_URL không phải localhost')

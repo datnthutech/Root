@@ -23,7 +23,7 @@ Trong headless Chromium chỉ có software WebGL (swiftshader), nên các số d
 ## Cách đo
 
 1. Chạy `./deploy.sh` ở thư mục gốc (toàn bộ app chạy trong Docker).
-2. Mở Chrome trên laptop thật và truy cập `http://localhost:7000/proto`.
+2. Mở Chrome trên laptop thật và truy cập `http://localhost:7070/proto`.
 3. Chọn 10.000 người. Ghi lại số "Bố cục: ... ms" hiển thị trên trang.
 4. Bấm "Đo fps 6 giây" 3 lần. Ghi lại fps trung bình và fps thấp nhất của mỗi lần.
 5. Phóng to đến mức zoom ≥ 0.8. Rê chuột vào 10 nút bất kỳ, xác nhận tooltip hiện đúng nút và không hiện khi rê vào vùng trống.

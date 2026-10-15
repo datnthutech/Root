@@ -11,10 +11,10 @@ Web gia phả nhiều dòng họ (nội + ngoại) dạng cây dọc, kéo/phón
 
 ## Chạy cục bộ (toàn bộ trong Docker)
 ```bash
-./deploy.sh          # build + chạy Postgres, MinIO, backend, frontend → http://localhost:7000 (admin / password123)
+./deploy.sh          # build + chạy Postgres, MinIO, backend, frontend → http://localhost:7070 (admin / password123)
 ./deploy.sh help     # down | restart | reset | status | logs
 ```
-Cổng: web 7000, API/Swagger 7080, MinIO console 7001 (đổi bằng `WEB_PORT`, `API_PORT`, `MINIO_PORT`). Chỉ cần Docker, không cần cài JDK/Node. `docker-compose.yml` là stack local; `docker-compose.prod.yml` dùng cho máy chủ thật.
+Cổng: web 7070, API/Swagger 7080, MinIO console 7001 (đổi bằng `WEB_PORT`, `API_PORT`, `MINIO_PORT`). Chỉ cần Docker, không cần cài JDK/Node. `docker-compose.yml` là stack local; `docker-compose.prod.yml` dùng cho máy chủ thật.
 
 ## Kiểm thử
 ```bash
