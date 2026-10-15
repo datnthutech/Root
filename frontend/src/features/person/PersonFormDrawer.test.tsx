@@ -171,6 +171,29 @@ test('ngày mất bằng ngày sinh được chấp nhận', async () => {
   await waitFor(() => expect(onSaved).toHaveBeenCalled())
 }, 30000)
 
+test('lỗi validate ngày mất được xoá khi đổi ngày sinh', async () => {
+  setup()
+  await fillDates('15/06/1950', 'Ngày', '01/01/1940')
+  expect(await screen.findByText('Ngày mất không được trước ngày sinh')).toBeInTheDocument()
+  await userEvent.clear(pickers()[0])
+  await userEvent.type(pickers()[0], '01/01/1930')
+  await userEvent.tab()
+  await waitFor(() => expect(screen.queryByText('Ngày mất không được trước ngày sinh')).not.toBeInTheDocument())
+}, 30000)
+
+test('reload lỗi biography giữ trạng thái xung đột và hiện Thử lại', async () => {
+  vi.mocked(editApi.updatePerson).mockRejectedValueOnce({ code: 'VERSION_CONFLICT', status: 409, message: '', details: null })
+  vi.mocked(personApi.profile).mockResolvedValue(profile({ version: 7, fullName: 'Tên Mới Nhất' }))
+  setup({ mode: 'edit', person: profile() })
+  await userEvent.click(await screen.findByRole('button', { name: 'Lưu' }))
+  vi.mocked(personApi.biography).mockRejectedValue({ code: 'UNKNOWN', status: 500, message: '', details: null })
+  await userEvent.click(await screen.findByRole('button', { name: 'Tải lại dữ liệu mới nhất' }))
+  expect(await screen.findByRole('button', { name: 'Thử lại' })).toBeInTheDocument()
+  expect(screen.getByText('Dữ liệu đã được người khác sửa')).toBeInTheDocument()
+  expect(screen.queryByDisplayValue('Tên Mới Nhất')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Lưu' })).not.toBeInTheDocument()
+}, 20000)
+
 test('refetch nền không làm mất nội dung đang gõ', async () => {
   const { qc } = setup({ mode: 'edit', person: profile() })
   const name = await screen.findByLabelText('Họ và tên')

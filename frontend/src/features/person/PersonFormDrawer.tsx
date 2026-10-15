@@ -8,12 +8,23 @@ import PersonForm from './PersonForm'
 
 type Props = { open: boolean; mode: 'create' | 'edit'; person?: PersonProfile; onClose(): void; onSaved(p: PersonProfile): void }
 
-/** Khoá theo người + trạng thái mở để mọi state nội bộ (fresh, conflict, reloading) được reset khi đổi. */
+/** Drawer giữ ổn định (để còn animation đóng); chỉ phần nội dung được khoá lại mỗi lần mở / đổi người để reset state. */
 export default function PersonFormDrawer(props: Props) {
-  return <DrawerInner key={`${props.person?.id ?? 'new'}-${props.open}`} {...props} />
+  const { open, mode, person, onClose } = props
+  const [openCount, setOpenCount] = useState(0)
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) setOpenCount((c) => c + 1)
+  }
+  return (
+    <Drawer open={open} onClose={onClose} width="min(520px, 100vw)" destroyOnClose title={mode === 'create' ? 'Thêm người mới' : 'Sửa hồ sơ'}>
+      <DrawerContent key={`${person?.id ?? 'new'}-${openCount}`} {...props} />
+    </Drawer>
+  )
 }
 
-function DrawerInner({ open, mode, person, onClose, onSaved }: Props) {
+function DrawerContent({ open, mode, person, onSaved }: Props) {
   const { message } = App.useApp()
   const qc = useQueryClient()
   const [busy, setBusy] = useState(false)
@@ -48,7 +59,8 @@ function DrawerInner({ open, mode, person, onClose, onSaved }: Props) {
   const reload = async () => {
     setReloading(true)
     try {
-      const [p] = await Promise.all([personApi.profile(person!.id), bio.refetch()])
+      const [p, bioRes] = await Promise.all([personApi.profile(person!.id), bio.refetch()])
+      if (bioRes.isError) return
       setFresh(p)
       setConflict(false)
       setFormKey((k) => k + 1)
@@ -59,11 +71,11 @@ function DrawerInner({ open, mode, person, onClose, onSaved }: Props) {
     }
   }
 
-  const formReady = mode === 'create' || (bio.data !== undefined && !reloading)
+  const formReady = mode === 'create' || (bio.data !== undefined && !bio.isError && !reloading)
 
   return (
-    <Drawer open={open} onClose={onClose} width="min(520px, 100vw)" destroyOnClose title={mode === 'create' ? 'Thêm người mới' : 'Sửa hồ sơ'}>
-      {mode === 'edit' && bio.isError && bio.data === undefined && (
+    <>
+      {mode === 'edit' && bio.isError && (
         <Alert type="error" showIcon message="Không tải được sơ yếu lý lịch"
           action={<Button size="small" onClick={() => bio.refetch()}>Thử lại</Button>} />
       )}
@@ -74,6 +86,6 @@ function DrawerInner({ open, mode, person, onClose, onSaved }: Props) {
       {formReady && (
         <PersonForm key={formKey} initial={current} initialBiography={bio.data?.biography ?? ''} busy={busy} onSubmit={submit} />
       )}
-    </Drawer>
+    </>
   )
 }

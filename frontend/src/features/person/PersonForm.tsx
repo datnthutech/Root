@@ -9,14 +9,14 @@ import BioEditor from './BioEditor'
 const PRECISIONS = [{ value: 'DAY', label: 'Ngày' }, { value: 'MONTH', label: 'Tháng' }, { value: 'YEAR', label: 'Năm' }, { value: 'UNKNOWN', label: 'Không rõ' }]
 const pickerOf = (p: Precision) => (p === 'YEAR' ? 'year' : p === 'MONTH' ? 'month' : 'date')
 
-function DateWithPrecision({ nameDate, namePrec, label, initialPrec, rules }: { nameDate: string; namePrec: string; label: string; initialPrec: Precision; rules?: Rule[] }) {
+function DateWithPrecision({ nameDate, namePrec, label, initialPrec, rules, dependencies }: { nameDate: string; namePrec: string; label: string; initialPrec: Precision; rules?: Rule[]; dependencies?: string[] }) {
   const form = Form.useFormInstance()
   const prec: Precision = Form.useWatch(namePrec, form) ?? initialPrec
   return (
     <Form.Item label={label}>
       <Space.Compact style={{ width: '100%' }}>
         <Form.Item name={namePrec} noStyle initialValue={initialPrec}><Select style={{ width: 110 }} options={PRECISIONS} /></Form.Item>
-        <Form.Item name={nameDate} noStyle rules={rules} dependencies={rules ? ['birthDate', 'birthPrecision', namePrec] : undefined}>
+        <Form.Item name={nameDate} noStyle rules={rules} dependencies={dependencies}>
           <DatePicker style={{ width: '100%' }} picker={pickerOf(prec)} disabled={prec === 'UNKNOWN'} format={prec === 'YEAR' ? 'YYYY' : prec === 'MONTH' ? 'MM/YYYY' : 'DD/MM/YYYY'} />
         </Form.Item>
       </Space.Compact>
@@ -76,7 +76,7 @@ export default function PersonForm({ initial, initialBiography = '', submitText 
       <Form.Item label="Còn sống"><Switch checked={alive} onChange={setAlive} /></Form.Item>
       {!alive && (
         <>
-          <DateWithPrecision nameDate="deathDate" namePrec="deathPrecision" label="Ngày mất (dương lịch)" rules={[deathAfterBirth]} initialPrec={(initial?.deathPrecision as Precision) ?? 'UNKNOWN'} />
+          <DateWithPrecision nameDate="deathDate" namePrec="deathPrecision" label="Ngày mất (dương lịch)" rules={[deathAfterBirth]} dependencies={['birthDate', 'birthPrecision', 'deathPrecision']} initialPrec={(initial?.deathPrecision as Precision) ?? 'UNKNOWN'} />
           <Form.Item label="Ngày giỗ (âm lịch)" name="deathAnniversaryLunar"><Input maxLength={40} placeholder="vd: 12/3 âm lịch" /></Form.Item>
         </>
       )}
