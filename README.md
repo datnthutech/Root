@@ -11,7 +11,7 @@ Web gia phả nhiều dòng họ (nội + ngoại) dạng cây dọc, kéo/phón
 
 ## Chạy cục bộ bằng Docker (một lệnh)
 ```bash
-./deploy.sh          # build + chạy Postgres, MinIO, backend, frontend → http://localhost:8088 (admin / password123)
+./deploy.sh          # build + chạy Postgres, MinIO, backend, frontend → http://localhost:7000 (admin / password123)
 ./deploy.sh help     # down | restart | reset | status | logs
 ```
 
