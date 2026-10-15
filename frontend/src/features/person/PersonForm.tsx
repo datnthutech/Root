@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { Rule } from 'antd/es/form'
 import { Button, DatePicker, Form, Input, Radio, Select, Space, Switch } from 'antd'
 import type { PersonProfile } from '../../api/person'
 import type { PersonInput } from '../../api/edit'
@@ -8,14 +9,14 @@ import BioEditor from './BioEditor'
 const PRECISIONS = [{ value: 'DAY', label: 'Ngày' }, { value: 'MONTH', label: 'Tháng' }, { value: 'YEAR', label: 'Năm' }, { value: 'UNKNOWN', label: 'Không rõ' }]
 const pickerOf = (p: Precision) => (p === 'YEAR' ? 'year' : p === 'MONTH' ? 'month' : 'date')
 
-function DateWithPrecision({ nameDate, namePrec, label, initialPrec }: { nameDate: string; namePrec: string; label: string; initialPrec: Precision }) {
+function DateWithPrecision({ nameDate, namePrec, label, initialPrec, rules }: { nameDate: string; namePrec: string; label: string; initialPrec: Precision; rules?: Rule[] }) {
   const form = Form.useFormInstance()
   const prec: Precision = Form.useWatch(namePrec, form) ?? initialPrec
   return (
     <Form.Item label={label}>
       <Space.Compact style={{ width: '100%' }}>
         <Form.Item name={namePrec} noStyle initialValue={initialPrec}><Select style={{ width: 110 }} options={PRECISIONS} /></Form.Item>
-        <Form.Item name={nameDate} noStyle>
+        <Form.Item name={nameDate} noStyle rules={rules}>
           <DatePicker style={{ width: '100%' }} picker={pickerOf(prec)} disabled={prec === 'UNKNOWN'} format={prec === 'YEAR' ? 'YYYY' : prec === 'MONTH' ? 'MM/YYYY' : 'DD/MM/YYYY'} />
         </Form.Item>
       </Space.Compact>
@@ -30,14 +31,23 @@ export default function PersonForm({ initial, initialBiography = '', submitText 
   const [form] = Form.useForm()
   const [alive, setAlive] = useState(initial?.alive ?? true)
 
+  const deathAfterBirth: Rule = ({ getFieldValue }) => ({
+    validator: (_, death) => {
+      const b = toIso(getFieldValue('birthDate'), getFieldValue('birthPrecision') ?? 'UNKNOWN')
+      const d = toIso(death, getFieldValue('deathPrecision') ?? 'UNKNOWN')
+      return b && d && d < b ? Promise.reject(new Error('Ngày mất không được trước ngày sinh')) : Promise.resolve()
+    },
+  })
+
   const finish = async (v: Record<string, unknown>) => {
     const bp = (v.birthPrecision ?? 'UNKNOWN') as Precision
     const dp = (v.deathPrecision ?? 'UNKNOWN') as Precision
+    const birthIso = toIso(v.birthDate as never, bp)
     await onSubmit({
       fullName: String(v.fullName).trim(),
       nickname: v.nickname as string | undefined,
       gender: v.gender as 'M' | 'F' | 'U',
-      birthDate: toIso(v.birthDate as never, bp), birthPrecision: toIso(v.birthDate as never, bp) ? bp : 'UNKNOWN',
+      birthDate: birthIso, birthPrecision: birthIso ? bp : 'UNKNOWN',
       birthLunar: v.birthLunar as string | undefined,
       alive,
       deathDate: alive ? null : toIso(v.deathDate as never, dp), deathPrecision: alive ? 'UNKNOWN' : dp,
@@ -66,7 +76,7 @@ export default function PersonForm({ initial, initialBiography = '', submitText 
       <Form.Item label="Còn sống"><Switch checked={alive} onChange={setAlive} /></Form.Item>
       {!alive && (
         <>
-          <DateWithPrecision nameDate="deathDate" namePrec="deathPrecision" label="Ngày mất (dương lịch)" initialPrec={(initial?.deathPrecision as Precision) ?? 'UNKNOWN'} />
+          <DateWithPrecision nameDate="deathDate" namePrec="deathPrecision" label="Ngày mất (dương lịch)" rules={[deathAfterBirth]} initialPrec={(initial?.deathPrecision as Precision) ?? 'UNKNOWN'} />
           <Form.Item label="Ngày giỗ (âm lịch)" name="deathAnniversaryLunar"><Input maxLength={40} placeholder="vd: 12/3 âm lịch" /></Form.Item>
         </>
       )}
