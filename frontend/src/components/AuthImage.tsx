@@ -11,7 +11,9 @@ export function AuthImage({ src, size, alt }: { src: string | null | undefined; 
     let cancelled = false
     rawFetch(src).then(async (r) => {
       if (!r.ok || cancelled) return
-      revoked = URL.createObjectURL(await r.blob())
+      const blob = await r.blob()
+      if (cancelled) return
+      revoked = URL.createObjectURL(blob)
       setUrl(revoked)
     }).catch(() => { /* hiện avatar mặc định */ })
     return () => { cancelled = true; if (revoked) URL.revokeObjectURL(revoked) }

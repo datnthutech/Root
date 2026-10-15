@@ -22,5 +22,8 @@ test('StrictMode: một canvas sống, renderer đầu bị destroy', () => {
   expect(container.querySelectorAll('canvas')).toHaveLength(1)
   expect(instances.length).toBeGreaterThanOrEqual(2)
   expect(instances[0].destroy).toHaveBeenCalled()
+  expect(instances[0].canvas).not.toBe(instances[1].canvas)
+  expect(instances[0].canvas.isConnected).toBe(false)
+  expect(instances[instances.length - 1].canvas.isConnected).toBe(true)
   expect(container.querySelector('canvas')).toBe(instances[instances.length - 1].canvas)
 })

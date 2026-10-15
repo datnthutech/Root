@@ -48,7 +48,7 @@ export const TreeCanvas = forwardRef<TreeCanvasHandle, Props>(function TreeCanva
     r.setPhotoStore(photos)
     rendererRef.current = r
     const p = propsRef.current
-    if (p.graph && p.layout) r.setData(p.graph, p.layout, { keepCamera: p.keepCamera })
+    if (p.graph && p.layout) r.setData(p.graph, p.layout, { keepCamera: false })
     r.setSelected(p.selectedId)
     return () => { photos.destroy(); r.destroy(); rendererRef.current = null; canvas.remove() }
   }, [])

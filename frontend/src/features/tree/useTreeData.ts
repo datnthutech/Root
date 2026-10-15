@@ -10,9 +10,9 @@ import { runLayout } from './layoutClient'
 export interface TreeParams { mode: 'clan' | 'focus'; clanId: number | null; side: Side; personId: number | null; up: number; down: number }
 
 export function useTreeData(p: TreeParams) {
-  const [base, setBase] = useState<{ graph: GraphData; etag: string } | null>(null)
+  const [base, setBase] = useState<{ graph: GraphData; etag: string; mark: string } | null>(null)
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
-  const [layout, setLayout] = useState<LayoutResult | null>(null)
+  const [pair, setPair] = useState<{ graph: GraphData; layout: LayoutResult } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<ApiFailure | null>(null)
   const [keepCamera, setKeepCamera] = useState(false)
@@ -28,7 +28,8 @@ export function useTreeData(p: TreeParams) {
       if (cancelled) return
       setCollapsed(p.mode === 'clan' ? defaultCollapsed(r.graph, DEFAULT_COLLAPSE_DEPTH) : new Set())
       setKeepCamera(false)
-      setBase(r)
+      const mark = p.mode === 'clan' ? p.side : `focus:${p.personId}:${p.up}:${p.down}`
+      setBase({ ...r, mark })
     }).catch((e) => { if (!cancelled) { setError(e as ApiFailure); setLoading(false) } })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -38,8 +39,7 @@ export function useTreeData(p: TreeParams) {
     if (!base) return
     let cancelled = false
     const ids = [...collapsed]
-    const mark = p.mode === 'clan' ? p.side : `focus:${p.personId}:${p.up}:${p.down}`
-    const key = layoutCacheKey(base.graph.clanId, base.etag, mark, ids)
+    const key = layoutCacheKey(base.graph.clanId, base.etag, base.mark, ids)
     ;(async () => {
       let result = base.etag ? await getCachedLayout(key) : undefined
       if (!result) {
@@ -49,16 +49,19 @@ export function useTreeData(p: TreeParams) {
       if (cancelled) return
       setKeepCamera(lastGraph.current === base.graph)
       lastGraph.current = base.graph
-      setLayout(result)
+      setPair({ graph: base.graph, layout: result })
       setLoading(false)
-    })()
+    })().catch((e) => {
+      if (cancelled) return
+      setError({ code: 'LAYOUT_FAILED', message: e instanceof Error ? e.message : String(e), details: null, status: 0 })
+      setLoading(false)
+    })
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [base, collapsed])
 
   const toggle = useCallback((id: number) => {
     setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }, [])
 
-  return { graph: base?.graph ?? null, layout, loading, error, collapsed, toggle, keepCamera }
+  return { graph: pair?.graph ?? null, layout: pair?.layout ?? null, loading, error, collapsed, toggle, keepCamera }
 }
