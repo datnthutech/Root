@@ -18,12 +18,15 @@ public class ClanMemberService {
     }
 
     @Transactional
-    public void rebuildClansOf(java.util.Collection<Long> personIds) {
+    public void rebuildClansOf(java.util.Collection<Long> personIds) { rebuildClansOf(personIds, null); }
+
+    @Transactional
+    public void rebuildClansOf(java.util.Collection<Long> personIds, Long excludeClanId) {
         if (personIds.isEmpty()) return;
         List<Long> clanIds = jdbc.queryForList(
             "SELECT DISTINCT clan_id FROM clan_member WHERE person_id = ANY(?) ORDER BY clan_id", Long.class,
             (Object) personIds.toArray(Long[]::new));
-        for (long clanId : clanIds) rebuild(clanId);
+        for (long clanId : clanIds) if (excludeClanId == null || clanId != excludeClanId) rebuild(clanId);
     }
 
     @Transactional

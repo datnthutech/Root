@@ -2,6 +2,8 @@ package vn.giapha.imports;
 
 import java.io.InputStream;
 import java.util.*;
+import jakarta.persistence.EntityManager;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -22,9 +24,11 @@ public class ExcelImportService {
     private final ClanMemberService clanMembers;
     private final AuditService audit;
     private final PlatformTransactionManager tm;
+    private final EntityManager em;
 
     public ExcelImportService(PersonRepository persons, UnionService unions, ParentChildService links, ClanRepository clans,
-                              ClanMemberService clanMembers, AuditService audit, PlatformTransactionManager tm) {
+                              ClanMemberService clanMembers, AuditService audit, PlatformTransactionManager tm, EntityManager em) {
+        this.em = em;
         this.persons = persons;
         this.unions = unions;
         this.links = links;
@@ -35,6 +39,7 @@ public class ExcelImportService {
     }
 
     public ImportReport run(AuthUser me, InputStream in, boolean dryRun) {
+        if (me.role() != vn.giapha.auth.Role.ADMIN) throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Chỉ quản trị viên được nhập Excel");
         List<ImportModel.Error> errors = new ArrayList<>(), warnings = new ArrayList<>();
         Parsed parsed = ImportParser.parse(ExcelReader.read(in), errors, warnings);
         if (!errors.isEmpty()) {
@@ -73,6 +78,7 @@ public class ExcelImportService {
             touched.add(p.getId());
         }
         persons.flush();
+        em.clear();
 
         Map<String, Long> unionIds = new HashMap<>();
         int unionCount = 0;
@@ -97,10 +103,12 @@ public class ExcelImportService {
             Long child = resolve(r.child(), ids, errors, "Quan hệ", r.row(), "Mã con");
             if (parent == null || child == null) continue;
             try {
-                links.add(parent, child, r.kind(), r.unionKey() == null ? null : unionIds.get(r.unionKey()));
+                ParentChildResult res = links.add(parent, child, r.kind(), r.unionKey() == null ? null : unionIds.get(r.unionKey()));
+                for (Warning w : res.warnings()) warnings.add(new ImportModel.Error("Quan hệ", r.row(), "", w.code(), w.message()));
                 touched.add(parent);
                 touched.add(child);
                 linkCount++;
+                if (linkCount % 500 == 0) { em.flush(); em.clear(); }
             } catch (ApiException e) {
                 errors.add(new ImportModel.Error("Quan hệ", r.row(), "", e.code(), e.getMessage()));
             }
@@ -112,6 +120,11 @@ public class ExcelImportService {
             Long founder = resolve(c.founderKey(), ids, errors, "Dòng họ", c.row(), "Mã thủy tổ");
             if (founder != null) {
                 Clan clan = clans.findAll().stream().filter(x -> x.getName().equalsIgnoreCase(c.name())).findFirst().orElseGet(Clan::new);
+                if (clan.getId() != null && clan.getFounderPersonId() != null && !clan.getFounderPersonId().equals(founder)) {
+                    errors.add(new ImportModel.Error("Dòng họ", c.row(), "Mã thủy tổ", "CLAN_EXISTS",
+                        "Dòng họ «" + clan.getName() + "» đã tồn tại với thủy tổ khác; không thể thay đổi thủy tổ bằng nhập Excel"));
+                    return new ImportReport(dryRun, parsed.persons().size(), unionCount, linkCount, errors, warnings, null);
+                }
                 clan.setName(c.name());
                 clan.setFounderPersonId(founder);
                 if (c.mode() != null) clan.setSiblingCountMode(c.mode());
@@ -122,7 +135,7 @@ public class ExcelImportService {
             }
         }
         if (errors.isEmpty()) {
-            clanMembers.rebuildClansOf(touched);
+            clanMembers.rebuildClansOf(touched, clanId);
             if (!dryRun) {
                 audit.record(me.id(), "IMPORT", clanId == null ? 0 : clanId, "IMPORT", null,
                     Map.of("persons", parsed.persons().size(), "unions", unionCount, "links", linkCount));
