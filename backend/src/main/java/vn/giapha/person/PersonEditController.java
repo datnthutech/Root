@@ -23,14 +23,14 @@ public class PersonEditController {
     @ResponseStatus(HttpStatus.CREATED)
     public PersonProfile create(@AuthenticationPrincipal AuthUser me, @Valid @RequestBody PersonInput in) {
         Person p = service.create(me, in);
-        return profiles.profile(p.getId(), me.role());
+        return profiles.profile(p.getId(), me);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('EDITOR')")
     public PersonProfile update(@AuthenticationPrincipal AuthUser me, @PathVariable long id, @Valid @RequestBody PersonInput in) {
         service.update(me, id, in);
-        return profiles.profile(id, me.role());
+        return profiles.profile(id, me);
     }
 
     @DeleteMapping("/{id}")

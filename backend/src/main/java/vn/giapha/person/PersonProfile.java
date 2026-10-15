@@ -11,4 +11,4 @@ public record PersonProfile(long id, String fullName, String nickname, Gender ge
     LocalDate deathDate, DatePrecision deathPrecision, Integer deathYear, String deathAnniversaryLunar,
     boolean alive, String originPlace, String homePlace, String burialPlace,
     Integer generation, Integer birthOrder, String orderLabel, boolean orderNeedsConfirm,
-    String photoUrl, long version, Long createdBy, Instant createdAt) {}
+    String photoUrl, long version, Long createdBy, Instant createdAt, boolean canEdit) {}

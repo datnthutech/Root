@@ -82,4 +82,17 @@ class PersonProfileApiTest {
         persons.saveAndFlush(c);
         mvc.perform(get("/api/v1/persons/" + ids.c()).header("Authorization", users.bearer(Role.ADMIN))).andExpect(status().isNotFound());
     }
+
+    @Test
+    void canEditReflectsPolicy() throws Exception {
+        var ids = fixture.create();
+        mvc.perform(get("/api/v1/persons/" + ids.a()).header("Authorization", users.bearer(Role.ADMIN))).andExpect(jsonPath("$.canEdit").value(true));
+        mvc.perform(get("/api/v1/persons/" + ids.a()).header("Authorization", users.bearer(Role.EDITOR))).andExpect(jsonPath("$.canEdit").value(false));
+        mvc.perform(get("/api/v1/persons/" + ids.a()).header("Authorization", users.bearer(Role.VIEWER))).andExpect(jsonPath("$.canEdit").value(false));
+        var editor = users.create(Role.EDITOR);
+        Person p = persons.findById(ids.c()).orElseThrow();
+        p.setCreatedBy(editor.getId());
+        persons.saveAndFlush(p);
+        mvc.perform(get("/api/v1/persons/" + ids.c()).header("Authorization", users.bearerFor(editor))).andExpect(jsonPath("$.canEdit").value(true));
+    }
 }

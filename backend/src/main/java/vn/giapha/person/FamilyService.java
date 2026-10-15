@@ -17,7 +17,8 @@ import vn.giapha.person.SiblingClassifier.Parent;
 @Service
 @Transactional(readOnly = true)
 public class FamilyService {
-    public record PersonRef(long id, String name, Gender gender, Integer birthYear, Integer deathYear, boolean alive, String orderLabel) {}
+    public record PersonRef(long id, String name, Gender gender, Integer birthYear, Integer deathYear, boolean alive,
+                            String orderLabel, Long linkId) {}
     public record SpouseFamily(long unionId, int unionOrder, UnionStatus status, LocalDate startDate, LocalDate endDate,
                                PersonRef partner, List<PersonRef> children) {}
     public record FamilyResponse(long personId, List<PersonRef> parents, List<SpouseFamily> spouses, List<PersonRef> otherChildren,
@@ -56,13 +57,17 @@ public class FamilyService {
         List<Long> clan = jdbc.queryForList("SELECT clan_id FROM clan_member WHERE person_id = ? ORDER BY clan_id LIMIT 1", Long.class, personId);
         Map<Long, OrderInfo> orderInfo = clan.isEmpty() ? Map.of() : orders.computeForClan(clan.get(0));
 
-        // cha mẹ
-        List<Long> parentIds = jdbc.queryForList("SELECT parent_id FROM parent_child WHERE child_id = ? ORDER BY id", Long.class, personId);
-        // con, kèm hôn phối
-        record ChildLink(long childId, Long unionId) {}
-        List<ChildLink> childLinks = jdbc.query("SELECT child_id, union_id FROM parent_child WHERE parent_id = ? ORDER BY id",
-            (rs, i) -> new ChildLink(rs.getLong(1), (Long) rs.getObject(2)), personId);
-        // hôn phối
+        Map<Long, Long> parentLinkId = new LinkedHashMap<>();
+        jdbc.query("SELECT parent_id, id FROM parent_child WHERE child_id = ? ORDER BY id",
+            rs -> { parentLinkId.put(rs.getLong(1), rs.getLong(2)); }, personId);
+        List<Long> parentIds = new ArrayList<>(parentLinkId.keySet());
+
+        record ChildLink(long childId, Long unionId, long linkId) {}
+        List<ChildLink> childLinks = jdbc.query("SELECT child_id, union_id, id FROM parent_child WHERE parent_id = ? ORDER BY id",
+            (rs, i) -> new ChildLink(rs.getLong(1), (Long) rs.getObject(2), rs.getLong(3)), personId);
+        Map<Long, Long> childLinkId = new HashMap<>();
+        childLinks.forEach(c -> childLinkId.put(c.childId(), c.linkId()));
+
         record UnionRow(long id, long partnerId, int order, UnionStatus status, LocalDate start, LocalDate end) {}
         List<UnionRow> unionRows = jdbc.query("""
             SELECT id, CASE WHEN partner_a_id = ? THEN partner_b_id ELSE partner_a_id END, union_order, status, start_date, end_date
@@ -70,7 +75,7 @@ public class FamilyService {
             (rs, i) -> new UnionRow(rs.getLong(1), rs.getLong(2), rs.getInt(3), UnionStatus.valueOf(rs.getString(4)),
                 rs.getDate(5) == null ? null : rs.getDate(5).toLocalDate(), rs.getDate(6) == null ? null : rs.getDate(6).toLocalDate()),
             personId, personId, personId);
-        // anh chị em: mọi con của cha mẹ mình
+
         record SibLink(long childId, long parentId) {}
         List<SibLink> sibLinks = parentIds.isEmpty() ? List.of() : jdbc.query(
             "SELECT child_id, parent_id FROM parent_child WHERE parent_id = ANY(?) AND child_id <> ?",
@@ -90,14 +95,15 @@ public class FamilyService {
         parentsOfSib.values().forEach(need::addAll);
         Map<Long, Row> rows = load(need);
 
-        java.util.function.Function<Long, PersonRef> ref = id -> {
+        java.util.function.BiFunction<Long, Map<Long, Long>, PersonRef> ref = (id, links) -> {
             Row r = rows.get(id);
             if (r == null) return null;
             OrderInfo o = orderInfo.get(id);
-            return new PersonRef(r.id(), r.name(), r.gender(), r.by(), r.dy(), r.alive(), o == null ? null : o.label());
+            return new PersonRef(r.id(), r.name(), r.gender(), r.by(), r.dy(), r.alive(), o == null ? null : o.label(), links.get(id));
         };
-        java.util.function.Function<Collection<Long>, List<PersonRef>> refs =
-            ids -> ids.stream().map(ref).filter(Objects::nonNull).toList();
+        java.util.function.BiFunction<Collection<Long>, Map<Long, Long>, List<PersonRef>> refs =
+            (ids, links) -> ids.stream().map(id -> ref.apply(id, links)).filter(Objects::nonNull).toList();
+        Map<Long, Long> none = Map.of();
 
         Set<Parent> mine = parentIds.stream().filter(rows::containsKey).map(id -> new Parent(id, rows.get(id).gender())).collect(Collectors.toSet());
         List<Long> full = new ArrayList<>(), halfF = new ArrayList<>(), halfM = new ArrayList<>();
@@ -112,13 +118,14 @@ public class FamilyService {
         Set<Long> unionIds = unionRows.stream().map(UnionRow::id).collect(Collectors.toSet());
         List<SpouseFamily> spouses = new ArrayList<>();
         for (UnionRow u : unionRows) {
-            PersonRef partner = ref.apply(u.partnerId());
+            PersonRef partner = ref.apply(u.partnerId(), none);
             if (partner == null) continue;
             List<Long> kids = childLinks.stream().filter(c -> Objects.equals(c.unionId(), u.id())).map(ChildLink::childId).toList();
-            spouses.add(new SpouseFamily(u.id(), u.order(), u.status(), u.start(), u.end(), partner, refs.apply(kids)));
+            spouses.add(new SpouseFamily(u.id(), u.order(), u.status(), u.start(), u.end(), partner, refs.apply(kids, childLinkId)));
         }
         List<Long> other = childLinks.stream().filter(c -> c.unionId() == null || !unionIds.contains(c.unionId()))
             .map(ChildLink::childId).toList();
-        return new FamilyResponse(personId, refs.apply(parentIds), spouses, refs.apply(other), refs.apply(full), refs.apply(halfF), refs.apply(halfM));
+        return new FamilyResponse(personId, refs.apply(parentIds, parentLinkId), spouses, refs.apply(other, childLinkId),
+            refs.apply(full, none), refs.apply(halfF, none), refs.apply(halfM, none));
     }
 }

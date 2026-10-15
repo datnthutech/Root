@@ -17,18 +17,20 @@ public class PersonProfileService {
     private final PersonRepository persons;
     private final JdbcTemplate jdbc;
     private final SiblingOrderService orders;
+    private final EditPolicy policy;
 
-    public PersonProfileService(PersonRepository persons, JdbcTemplate jdbc, SiblingOrderService orders) {
+    public PersonProfileService(PersonRepository persons, JdbcTemplate jdbc, SiblingOrderService orders, EditPolicy policy) {
         this.persons = persons;
         this.jdbc = jdbc;
         this.orders = orders;
+        this.policy = policy;
     }
 
     static Integer year(LocalDate d, DatePrecision p) { return d == null || p == DatePrecision.UNKNOWN ? null : d.getYear(); }
 
-    public PersonProfile profile(long id, Role viewerRole) {
+    public PersonProfile profile(long id, vn.giapha.auth.AuthUser me) {
         Person p = persons.findByIdAndDeletedAtIsNull(id).orElseThrow(this::notFound);
-        boolean hideFull = viewerRole == Role.VIEWER && p.isAlive();
+        boolean hideFull = me.role() == Role.VIEWER && p.isAlive();
 
         var clanRow = jdbc.queryForList(
             "SELECT clan_id, generation FROM clan_member WHERE person_id = ? ORDER BY clan_id LIMIT 1", id);
@@ -45,7 +47,7 @@ public class PersonProfileService {
             p.isAlive(), p.getOriginPlace(), p.getHomePlace(), p.getBurialPlace(), generation,
             order == null ? null : order.number(), order == null ? null : order.label(), order != null && order.needsConfirm(),
             p.getPhotoKey() == null ? null : "/persons/" + id + "/photo?size=256&v=" + p.getPhotoKey(),
-            p.getVersion(), p.getCreatedBy(), p.getCreatedAt());
+            p.getVersion(), p.getCreatedBy(), p.getCreatedAt(), policy.canEdit(me, p));
     }
 
     public BiographyResponse biography(long id) {

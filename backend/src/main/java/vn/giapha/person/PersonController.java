@@ -19,7 +19,7 @@ public class PersonController {
 
     @GetMapping("/{id}")
     public PersonProfile get(@PathVariable long id, @AuthenticationPrincipal AuthUser me) {
-        return profiles.profile(id, me.role());
+        return profiles.profile(id, me);
     }
 
     @GetMapping("/{id}/biography")

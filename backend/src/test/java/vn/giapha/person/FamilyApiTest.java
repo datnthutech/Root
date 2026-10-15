@@ -74,4 +74,13 @@ class FamilyApiTest {
         mvc.perform(get(url(99999999)).header("Authorization", users.bearer(Role.VIEWER))).andExpect(status().isNotFound());
         mvc.perform(get(url(1))).andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void relationsCarryLinkIdsForRemoval() throws Exception {
+        var ids = fixture.create();
+        mvc.perform(get(url(ids.a())).header("Authorization", users.bearer(Role.EDITOR)))
+           .andExpect(jsonPath("$.parents[0].linkId").isNumber())
+           .andExpect(jsonPath("$.spouses[0].children[0].linkId").isNumber())
+           .andExpect(jsonPath("$.fullSiblings[0].linkId").value(org.hamcrest.Matchers.nullValue()));
+    }
 }
