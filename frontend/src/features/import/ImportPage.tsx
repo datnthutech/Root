@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Alert, App, Button, Space, Table, Typography, Upload } from 'antd'
 import { InboxOutlined } from '@ant-design/icons'
@@ -14,22 +15,38 @@ const columns = [
 
 export default function ImportPage() {
   const { message } = App.useApp()
-  const [file, setFile] = useState<File | null>(null)
-  const [dry, setDry] = useState<ImportReport | null>(null)
+  const qc = useQueryClient()
+  const [file, setFileState] = useState<File | null>(null)
+  const fileRef = useRef<File | null>(null)
+  const [dryRes, setDryRes] = useState<{ file: File; report: ImportReport } | null>(null)
   const [done, setDone] = useState<ImportReport | null>(null)
   const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
+
+  const setFile = (f: File | null) => { fileRef.current = f; setFileState(f); setDryRes(null); setDone(null) }
+  const dry = dryRes && dryRes.file === file ? dryRes.report : null
 
   const run = async (dryRun: boolean) => {
-    if (!file || busy) return
+    const f = file
+    if (!f || busyRef.current) return
+    if (!dryRun && !(dryRes && dryRes.file === f && dryRes.report.errors.length === 0)) return
+    busyRef.current = true
     setBusy(true)
     try {
-      const r = await importApi.upload(file, dryRun)
-      if (dryRun) { setDry(r); setDone(null) }
-      else if (r.errors.length) setDry({ ...r, dryRun: true })
-      else { setDone(r); message.success('Đã nhập xong') }
+      const r = await importApi.upload(f, dryRun)
+      if (fileRef.current !== f) return
+      if (dryRun) { setDryRes({ file: f, report: r }); setDone(null) }
+      else if (r.errors.length) setDryRes({ file: f, report: { ...r, dryRun: true } })
+      else {
+        setDone(r)
+        message.success('Đã nhập xong')
+        for (const k of ['clans', 'person', 'person-family', 'person-bio', 'tree', 'tree-graph', 'audit'])
+          void qc.invalidateQueries({ queryKey: [k] })
+      }
     } catch (e) {
       message.error(errorText((e as { code?: string }).code))
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
@@ -39,8 +56,8 @@ export default function ImportPage() {
     <div style={{ padding: 16, maxWidth: 960, margin: '0 auto' }}>
       <Space direction="vertical" style={{ width: '100%' }} size="middle">
         <Button onClick={async () => { try { await importApi.downloadTemplate() } catch (e) { message.error(errorText((e as { code?: string }).code)) } }}>Tải mẫu Excel</Button>
-        <Upload.Dragger accept=".xlsx" maxCount={1} showUploadList={!!file} beforeUpload={(f) => { setFile(f as File); setDry(null); setDone(null); return false }}
-          onRemove={() => { setFile(null); setDry(null); setDone(null) }}>
+        <Upload.Dragger accept=".xlsx" maxCount={1} disabled={busy} showUploadList={!!file} beforeUpload={(f) => { setFile(f as File); return false }}
+          onRemove={() => { setFile(null) }}>
           <p className="ant-upload-drag-icon"><InboxOutlined /></p>
           <p>Kéo thả hoặc bấm để chọn tệp .xlsx</p>
         </Upload.Dragger>
