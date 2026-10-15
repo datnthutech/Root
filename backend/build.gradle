@@ -47,9 +47,27 @@ tasks.named('jar') {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'perf'
+    }
     testLogging {
         events 'failed'
         exceptionFormat 'full'
     }
+}
+
+tasks.register('perfTest', Test) {
+    description = 'Chạy các test hiệu năng (tag perf)'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'perf'
+    }
+    testLogging {
+        showStandardStreams = true      // để thấy dòng "PERF ..."
+        events 'failed'
+    }
+    outputs.upToDateWhen { false }      // luôn chạy lại
+    shouldRunAfter tasks.named('test')
 }
