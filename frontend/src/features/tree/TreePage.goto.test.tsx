@@ -12,7 +12,7 @@ vi.mock('./TreeCanvas', async () => {
 vi.mock('./TreeToolbar', () => ({ TreeToolbar: ({ onPick }: { onPick(id: number): void }) => (<><button onClick={() => onPick(5)}>pick5</button><button onClick={() => onPick(6)}>pick6</button></>) }))
 const graph = { persons: [{ id: 5 }, { id: 6 }] }
 const layout = { nodes: [{ id: 5 }], edges: [], width: 1, height: 1 }
-vi.mock('./useTreeData', () => ({ useTreeData: () => ({ graph, layout, loading: false, error: null, collapsed: new Set(), toggle: () => {}, keepCamera: false }) }))
+vi.mock('./useTreeData', () => ({ useTreeData: () => ({ graph, layout, loading: false, error: null, collapsed: new Set(), toggle: () => {}, keepCamera: false, refresh: () => {} }) }))
 vi.mock('../../api/tree', async (orig) => ({ ...(await orig<typeof import('../../api/tree')>()), listClans: vi.fn(async () => []) }))
 
 const Where = () => <div data-testid="where">{useLocation().search}</div>

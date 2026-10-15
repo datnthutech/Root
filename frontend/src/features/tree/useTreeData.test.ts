@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { useTreeData, type TreeParams } from './useTreeData'
 import * as tree from '../../api/tree'
 import * as client from './layoutClient'
@@ -41,4 +41,22 @@ test('graph và layout luôn là cặp nhất quán', async () => {
     if (gr === g2) expect(l).toEqual(lay('L2'))
     if (l && (l as never as { tag: string }).tag === 'L1') expect(gr).toBe(g1)
   }
+})
+
+test('refresh tải lại cùng nguồn nhưng giữ tập thu gọn và camera', async () => {
+  const g1 = { clanId: 1, rootPersonId: 1, persons: [{ id: 1 }, { id: 2 }, { id: 3 }], unions: [], links: [] } as never
+  const g2 = { clanId: 1, rootPersonId: 1, persons: [{ id: 1 }, { id: 2 }], unions: [], links: [] } as never // người 3 đã bị xoá
+  vi.mocked(tree.loadClanGraph).mockResolvedValueOnce({ graph: g1, etag: 'a' } as never).mockResolvedValueOnce({ graph: g2, etag: 'b' } as never)
+  vi.mocked(client.runLayout).mockResolvedValue(lay('L'))
+  const { result } = renderHook(() => useTreeData(params(1)))
+  await waitFor(() => expect(result.current.layout).not.toBeNull())
+  act(() => { result.current.toggle(2); result.current.toggle(3) })
+  await waitFor(() => expect(result.current.collapsed.has(2)).toBe(true))
+  const callsBefore = vi.mocked(client.runLayout).mock.calls.length
+  act(() => result.current.refresh())
+  await waitFor(() => expect(result.current.graph).toBe(g2))
+  expect(tree.loadClanGraph).toHaveBeenCalledTimes(2)
+  expect([...result.current.collapsed]).toEqual([2])
+  expect(result.current.keepCamera).toBe(true)
+  expect(vi.mocked(client.runLayout).mock.calls.length).toBeGreaterThan(callsBefore)
 })

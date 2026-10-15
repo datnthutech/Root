@@ -8,7 +8,7 @@ export interface PersonProfile {
   generation?: number; birthOrder?: number; orderLabel?: string; orderNeedsConfirm?: boolean
   photoUrl?: string; canEdit: boolean; version: number; createdBy?: number; createdAt: string
 }
-export interface PersonRef { id: number; name: string; gender: 'M' | 'F' | 'U'; birthYear: number | null; deathYear: number | null; alive: boolean; orderLabel: string | null }
+export interface PersonRef { id: number; name: string; gender: 'M' | 'F' | 'U'; birthYear: number | null; deathYear: number | null; alive: boolean; orderLabel: string | null; linkId: number | null }
 export interface SpouseFamily { unionId: number; unionOrder: number; status: string; startDate?: string; endDate?: string; partner: PersonRef; children: PersonRef[] }
 export interface FamilyResponse {
   personId: number; parents: PersonRef[]; spouses: SpouseFamily[]; otherChildren: PersonRef[]

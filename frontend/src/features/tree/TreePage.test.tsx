@@ -6,7 +6,7 @@ import TreePage from './TreePage'
 import * as treeApi from '../../api/tree'
 
 vi.mock('./TreeCanvas', () => ({ TreeCanvas: () => <div data-testid="canvas" /> }))
-vi.mock('./useTreeData', () => ({ useTreeData: () => ({ graph: null, layout: null, loading: false, error: null, collapsed: new Set(), toggle: () => {}, keepCamera: false }) }))
+vi.mock('./useTreeData', () => ({ useTreeData: () => ({ graph: null, layout: null, loading: false, error: null, collapsed: new Set(), toggle: () => {}, keepCamera: false, refresh: () => {} }) }))
 vi.mock('../../api/tree', async (orig) => ({ ...(await orig<typeof import('../../api/tree')>()), listClans: vi.fn(), searchPersons: vi.fn(async () => []) }))
 
 const Where = () => <div data-testid="where">{useLocation().search}</div>

@@ -3,13 +3,14 @@ import type { ClanSummary, Side } from '../../api/tree'
 import type { TreeParams } from './useTreeData'
 import { PersonSearch } from './PersonSearch'
 
-export function TreeToolbar({ params, clans, myPersonId, onChange, onPick, onFit }: {
+export function TreeToolbar({ params, clans, myPersonId, onChange, onPick, onFit, onAddPerson }: {
   params: TreeParams
   clans: ClanSummary[]
   myPersonId: number | null
   onChange(next: TreeParams): void
   onPick(personId: number): void
   onFit(): void
+  onAddPerson?: () => void
 }) {
   const firstClan = clans[0]?.id ?? null
   return (
@@ -35,6 +36,7 @@ export function TreeToolbar({ params, clans, myPersonId, onChange, onPick, onFit
       )}
       <PersonSearch onPick={onPick} />
       {myPersonId !== null && <Button onClick={() => onChange({ ...params, mode: 'focus', personId: myPersonId, clanId: null })}>Vị trí của tôi</Button>}
+      {onAddPerson && <Button type="primary" onClick={onAddPerson}>Thêm người</Button>}
       <Button onClick={onFit}>Vừa khung</Button>
     </Space>
   )

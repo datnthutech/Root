@@ -1,13 +1,17 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { App as AntApp } from 'antd'
+import { AuthContext } from '../../auth/AuthContext'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import PersonDialog from './PersonDialog'
 import { personApi } from '../../api/person'
+import { editApi } from '../../api/edit'
 
+vi.mock('../../api/edit', async (orig) => ({ ...(await orig<typeof import('../../api/edit')>()), editApi: { deletePerson: vi.fn() } }))
 vi.mock('../../api/person', async (orig) => ({ ...(await orig<typeof import('../../api/person')>()), personApi: { profile: vi.fn(), family: vi.fn(), biography: vi.fn() } }))
 
 const ref = (id: number, name: string, orderLabel: string | null = null) =>
-  ({ id, name, gender: 'M' as const, birthYear: 1950, deathYear: null, alive: true, orderLabel })
+  ({ id, name, gender: 'M' as const, birthYear: 1950, deathYear: null, alive: true, orderLabel, linkId: null })
 
 beforeEach(() => {
   vi.mocked(personApi.profile).mockResolvedValue({
@@ -22,11 +26,13 @@ beforeEach(() => {
   vi.mocked(personApi.biography).mockResolvedValue({ personId: 5, biography: 'Ông **An** làm ruộng\n- Con 1' })
 })
 
-function setup(onNavigate = vi.fn(), onClose = vi.fn()) {
+function setup(onNavigate = vi.fn(), onClose = vi.fn(), role: 'VIEWER' | 'EDITOR' | 'ADMIN' = 'VIEWER') {
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <PersonDialog personId={5} onClose={onClose} onNavigate={onNavigate} />
-    </QueryClientProvider>,
+    <AuthContext.Provider value={{ user: { id: 1, username: 'v', displayName: null, role, linkedPersonId: null }, loading: false, login: async () => {}, logout: async () => {} }}>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <AntApp><PersonDialog personId={5} onClose={onClose} onNavigate={onNavigate} onTreeChanged={() => {}} /></AntApp>
+      </QueryClientProvider>
+    </AuthContext.Provider>,
   )
   return { onNavigate, onClose }
 }
@@ -68,3 +74,37 @@ test('VIEWER người còn sống: chỉ có năm sinh', async () => {
   expect(await screen.findByText('Người Sống')).toBeInTheDocument()
   expect(screen.getByText('1953 (chỉ hiện năm)')).toBeInTheDocument()
 })
+
+test('VIEWER không thấy nút sửa, xoá, đổi ảnh, thứ tự hay thêm quan hệ', async () => {
+  setup()
+  await screen.findByText('Nguyễn Văn An')
+  expect(screen.queryByRole('button', { name: 'Sửa hồ sơ' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Đổi ảnh/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Xoá' })).not.toBeInTheDocument()
+  expect(screen.queryByText(/Đặt thứ tự thủ công/)).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('tab', { name: 'Gia đình' }))
+  await screen.findByText(/Vợ An/)
+  expect(screen.queryByRole('button', { name: 'Thêm con' })).not.toBeInTheDocument()
+})
+
+test('EDITOR không sở hữu (canEdit=false) chỉ có thứ tự và quan hệ, không có sửa/ảnh/xoá', async () => {
+  setup(vi.fn(), vi.fn(), 'EDITOR')
+  await screen.findByText('Nguyễn Văn An')
+  expect(screen.queryByRole('button', { name: 'Sửa hồ sơ' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Xoá' })).not.toBeInTheDocument()
+  expect(screen.getByText(/Đặt thứ tự thủ công/)).toBeInTheDocument()
+})
+
+test('ADMIN xoá người: gọi deletePerson, đóng popup và báo cây làm mới', async () => {
+  vi.mocked(personApi.profile).mockResolvedValue({
+    id: 5, fullName: 'Nguyễn Văn An', gender: 'M', alive: true, version: 0, createdAt: '2026-01-01T00:00:00Z', canEdit: true,
+  })
+  vi.mocked(editApi.deletePerson).mockResolvedValue(undefined)
+  const { onClose } = setup(vi.fn(), vi.fn(), 'ADMIN')
+  expect(await screen.findByRole('button', { name: 'Sửa hồ sơ' })).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Xoá' }))
+  await waitFor(() => expect(screen.getAllByRole('button', { name: 'Xoá' })).toHaveLength(2))
+  await userEvent.click(screen.getAllByRole('button', { name: 'Xoá' })[1])
+  await waitFor(() => expect(editApi.deletePerson).toHaveBeenCalledWith(5))
+  await waitFor(() => expect(onClose).toHaveBeenCalled())
+}, 20000)

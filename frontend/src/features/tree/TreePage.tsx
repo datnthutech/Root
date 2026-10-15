@@ -5,7 +5,9 @@ import { Alert, Empty, Spin } from 'antd'
 import { useAuth } from '../../auth/AuthContext'
 import { listClans } from '../../api/tree'
 import { errorText } from '../../auth/errorText'
+import { hasRole } from '../../auth/RequireAuth'
 import PersonDialog from '../person/PersonDialog'
+import PersonFormDrawer from '../person/PersonFormDrawer'
 import { HoverCard } from './HoverCard'
 import { Minimap } from './Minimap'
 import { TreeCanvas, type TreeCanvasHandle } from './TreeCanvas'
@@ -25,6 +27,7 @@ export default function TreePage() {
   const canvas = useRef<TreeCanvasHandle>(null)
   const [selected, setSelected] = useState<number | null>(null)
   const [dialogId, setDialogId] = useState<number | null>(null)
+  const [creating, setCreating] = useState(false)
   const [view, setView] = useState<ViewInfo | null>(null)
   const hover = useHoverCard(300, canHover())
   const pendingFocus = useRef<number | null>(null)
@@ -80,7 +83,7 @@ export default function TreePage() {
       <div style={{ position: 'absolute', top: 8, left: 8, right: 8, pointerEvents: 'none' }}>
         <div style={{ pointerEvents: 'auto', display: 'inline-block', maxWidth: '100%' }}>
           <TreeToolbar params={params} clans={clans.data ?? []} myPersonId={myPerson} onChange={update} onPick={goTo}
-            onFit={() => canvas.current?.fit()} />
+            onFit={() => canvas.current?.fit()} onAddPerson={hasRole(user, 'EDITOR') ? () => setCreating(true) : undefined} />
         </div>
       </div>
       {data.error && <Alert type="error" showIcon style={{ position: 'absolute', top: 64, left: 8 }} message={errorText(data.error.code)} />}
@@ -89,7 +92,9 @@ export default function TreePage() {
         <Minimap layout={data.layout} view={view} onNavigate={(x, y) => canvas.current?.moveCenterTo(x, y)} />
       </div>
       {hovered && hover.card && <HoverCard person={hovered} x={hover.card.x} y={hover.card.y} />}
-      <PersonDialog personId={dialogId} onClose={() => setDialogId(null)} onNavigate={goTo} />
+      <PersonDialog personId={dialogId} onClose={() => setDialogId(null)} onNavigate={goTo} onTreeChanged={data.refresh} />
+      <PersonFormDrawer open={creating} mode="create" onClose={() => setCreating(false)}
+        onSaved={(p) => { setCreating(false); setDialogId(p.id); data.refresh() }} />
     </div>
   )
 }

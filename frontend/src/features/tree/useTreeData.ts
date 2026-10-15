@@ -16,9 +16,12 @@ export function useTreeData(p: TreeParams) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<ApiFailure | null>(null)
   const [keepCamera, setKeepCamera] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
+  const loadedSource = useRef<string | null>(null)
   const lastGraph = useRef<GraphData | null>(null)
 
-  const sourceKey = `${p.mode}:${p.clanId}:${p.side}:${p.personId}:${p.up}:${p.down}`
+  const paramsKey = `${p.mode}:${p.clanId}:${p.side}:${p.personId}:${p.up}:${p.down}`
+  const sourceKey = `${paramsKey}:${reloadToken}`
   useEffect(() => {
     if ((p.mode === 'clan' && p.clanId === null) || (p.mode === 'focus' && p.personId === null)) return
     let cancelled = false
@@ -26,8 +29,16 @@ export function useTreeData(p: TreeParams) {
     const load = p.mode === 'clan' ? loadClanGraph(p.clanId!, p.side) : loadFocusGraph(p.personId!, p.up, p.down)
     load.then((r) => {
       if (cancelled) return
-      setCollapsed(p.mode === 'clan' ? defaultCollapsed(r.graph, DEFAULT_COLLAPSE_DEPTH) : new Set())
-      setKeepCamera(false)
+      // làm mới cùng nguồn (sau khi sửa): giữ tập thu gọn (bỏ id không còn) và camera; đổi nguồn: về mặc định
+      const sameSource = loadedSource.current === paramsKey
+      loadedSource.current = paramsKey
+      if (sameSource) {
+        const ids = new Set(r.graph.persons.map((x) => x.id))
+        setCollapsed((prev) => new Set([...prev].filter((id) => ids.has(id))))
+      } else {
+        setCollapsed(p.mode === 'clan' ? defaultCollapsed(r.graph, DEFAULT_COLLAPSE_DEPTH) : new Set())
+      }
+      setKeepCamera(sameSource)
       const mark = p.mode === 'clan' ? p.side : `focus:${p.personId}:${p.up}:${p.down}`
       setBase({ ...r, mark })
     }).catch((e) => { if (!cancelled) { setError(e as ApiFailure); setLoading(false) } })
@@ -47,7 +58,7 @@ export function useTreeData(p: TreeParams) {
         if (base.etag) void setCachedLayout(key, result)
       }
       if (cancelled) return
-      setKeepCamera(lastGraph.current === base.graph)
+      setKeepCamera((k) => k || lastGraph.current === base.graph)
       lastGraph.current = base.graph
       setPair({ graph: base.graph, layout: result })
       setLoading(false)
@@ -63,5 +74,7 @@ export function useTreeData(p: TreeParams) {
     setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }, [])
 
-  return { graph: pair?.graph ?? null, layout: pair?.layout ?? null, loading, error, collapsed, toggle, keepCamera }
+  const refresh = useCallback(() => setReloadToken((n) => n + 1), [])
+
+  return { graph: pair?.graph ?? null, layout: pair?.layout ?? null, loading, error, collapsed, toggle, keepCamera, refresh }
 }
