@@ -1,7 +1,6 @@
 package vn.giapha;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import org.junit.jupiter.api.Test;
@@ -28,6 +27,6 @@ class SwaggerDisabledTest {
 
     @Test
     void apiDocsNotServed() throws Exception {
-        assertNotEquals(200, mvc.perform(get("/v3/api-docs")).andReturn().getResponse().getStatus());
+        assertEquals(404, mvc.perform(get("/v3/api-docs")).andReturn().getResponse().getStatus());
     }
 }

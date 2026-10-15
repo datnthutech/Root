@@ -3,7 +3,9 @@ build/
 node_modules/
 dist/
 .env
-.env.prod
+.env.*
+!.env.example
+!.env.prod.example
 .idea/
 .vscode/
 .DS_Store
