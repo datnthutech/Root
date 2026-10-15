@@ -52,6 +52,9 @@ public class RevertService {
                 case "UNION" -> revertUnion(me, r);
                 default -> throw notRevertible("Mục này không khôi phục được");
             }
+        } catch (IllegalArgumentException | java.time.DateTimeException e) {
+            // snapshot không đọc được / thiếu trường bắt buộc
+            throw notRevertible("Dữ liệu lịch sử không hợp lệ");
         } catch (ApiException e) {
             // một đối tượng liên quan đã bị xoá: không còn khôi phục được (không phải lỗi "không tìm thấy mục nhật ký")
             if ("NOT_FOUND".equals(e.code())) throw notRevertible("Dữ liệu liên quan không còn tồn tại");
@@ -61,7 +64,7 @@ public class RevertService {
 
     private void revertPerson(AuthUser me, Row r) {
         switch (r.action()) {
-            case "UPDATE", "SET_BIRTH_ORDER" -> persons.applyHistory(me, r.entityId(), r.before());
+            case "UPDATE", "SET_BIRTH_ORDER" -> persons.applyHistory(me, r.entityId(), requireObject(r.before()));
             case "CREATE" -> persons.softDelete(me, r.entityId(), "REVERT");
             case "DELETE" -> persons.restore(me, r.entityId());
             default -> throw notRevertible("Mục này không khôi phục được");
@@ -76,7 +79,8 @@ public class RevertService {
             audit.record(me.id(), "PARENT_CHILD", l.getId(), "REVERT", before, null);
             clans.rebuildClansOf(List.of(l.getParentId(), l.getChildId()));
         } else {
-            LinkSnapView s = om.convertValue(r.before(), LinkSnapView.class);
+            LinkSnapView s = om.convertValue(requireObject(r.before()), LinkSnapView.class);
+            if (s.parentId() == null || s.childId() == null) throw notRevertible("Dữ liệu lịch sử không hợp lệ");
             Long unionId = s.unionId() != null && unionRepo.existsById(s.unionId()) ? s.unionId() : null;
             var res = pcs.add(s.parentId(), s.childId(), s.kind(), unionId);
             audit.record(me.id(), "PARENT_CHILD", res.link().getId(), "REVERT", null, Snapshots.of(res.link()));
@@ -96,7 +100,7 @@ public class RevertService {
             case "UPDATE" -> {
                 UnionRel u = unionRepo.findById(r.entityId()).orElseThrow(() -> notRevertible("Hôn phối này đã bị gỡ"));
                 var before = Snapshots.of(u);
-                UnionSnapView s = om.convertValue(r.before(), UnionSnapView.class);
+                UnionSnapView s = om.convertValue(requireObject(r.before()), UnionSnapView.class);
                 unions.update(u.getId(), s.order(), s.status(), null, null);
                 UnionRel fresh = unionRepo.findById(u.getId()).orElseThrow();
                 fresh.setStartDate(s.startDate());
@@ -105,7 +109,14 @@ public class RevertService {
                 audit.record(me.id(), "UNION", u.getId(), "REVERT", before, Snapshots.of(fresh));
             }
             case "DELETE" -> {
-                UnionSnapView s = om.convertValue(r.before(), UnionSnapView.class);
+                UnionSnapView s = om.convertValue(requireObject(r.before()), UnionSnapView.class);
+                if (s.partnerAId() == null || s.partnerBId() == null || s.status() == null) throw notRevertible("Dữ liệu lịch sử không hợp lệ");
+                Integer dup = jdbc.queryForObject("""
+                    SELECT count(*) FROM union_rel WHERE status = ? AND start_date IS NOT DISTINCT FROM ?::date
+                      AND ((partner_a_id = ? AND partner_b_id = ?) OR (partner_a_id = ? AND partner_b_id = ?))
+                    """, Integer.class, s.status().name(), s.startDate(), s.partnerAId(), s.partnerBId(), s.partnerBId(), s.partnerAId());
+                if (dup != null && dup > 0) throw notRevertible("Hôn phối này đã được khôi phục");
+                // Lưu ý: hôn phối tạo lại có id mới và không gắn lại parent_child.union_id cũ (đã bị bỏ khi xoá).
                 UnionRel created = unions.create(s.partnerAId(), s.partnerBId(), s.order(), s.status(), s.startDate(), s.endDate());
                 audit.record(me.id(), "UNION", created.getId(), "REVERT", null, Snapshots.of(created));
                 clans.rebuildClansOf(List.of(s.partnerAId(), s.partnerBId()));
@@ -124,6 +135,11 @@ public class RevertService {
     private JsonNode parse(String s) {
         if (s == null) return null;
         try { return om.readTree(s); } catch (JsonProcessingException e) { return null; }
+    }
+
+    private JsonNode requireObject(JsonNode n) {
+        if (n == null || !n.isObject()) throw notRevertible("Mục này không có dữ liệu để khôi phục");
+        return n;
     }
 
     private ApiException notRevertible(String m) { return new ApiException(HttpStatus.CONFLICT, "NOT_REVERTIBLE", m); }

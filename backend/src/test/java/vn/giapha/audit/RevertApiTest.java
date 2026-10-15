@@ -29,6 +29,7 @@ class RevertApiTest {
     @Autowired TreeFixture fixture;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper om;
+    @Autowired jakarta.persistence.EntityManager em;
 
     static final String JSON = MediaType.APPLICATION_JSON_VALUE;
 
@@ -61,7 +62,13 @@ class RevertApiTest {
         mvc.perform(post("/api/v1/audit/" + auditFirst + "/revert").header("Authorization", a)).andExpect(status().isNoContent());
         assertThat(jdbc.queryForObject("SELECT full_name FROM person WHERE id=?", String.class, ids.c())).isEqualTo("Nguyễn Văn Cường");
         assertThat(jdbc.queryForObject("SELECT nickname FROM person WHERE id=?", String.class, ids.c())).isNull();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE action='REVERT' AND entity_id=?", Integer.class, ids.c())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT before_data->>'fullName' FROM audit_log WHERE entity_type='PERSON' AND action='REVERT' AND entity_id=?", String.class, ids.c())).isEqualTo("Sửa Lần 2");
+        assertThat(jdbc.queryForObject("SELECT after_data->>'fullName' FROM audit_log WHERE entity_type='PERSON' AND action='REVERT' AND entity_id=?", String.class, ids.c())).isEqualTo("Nguyễn Văn Cường");
+        // @Version vẫn hợp lệ: PUT với version mới thành công
+        long v2 = jdbc.queryForObject("SELECT version FROM person WHERE id=?", Long.class, ids.c());
+        mvc.perform(put("/api/v1/persons/" + ids.c()).header("Authorization", a).contentType(JSON)
+            .content("{\"fullName\":\"Sau Revert\",\"gender\":\"M\",\"alive\":true,\"version\":" + v2 + "}")).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE entity_type='PERSON' AND action='REVERT' AND entity_id=?", Integer.class, ids.c())).isEqualTo(1);
     }
 
     @Test
@@ -124,10 +131,10 @@ class RevertApiTest {
         // sau khi gỡ G→A, gắn A1 (cháu của A) làm cha của G? → G là hậu duệ của... tạo quan hệ A → G
         mvc.perform(post("/api/v1/relations/parent-child").header("Authorization", a).contentType(JSON)
             .content("{\"parentId\":" + ids.a() + ",\"childId\":" + ids.g() + "}")).andExpect(status().isCreated());
-        int audits = jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE action='REVERT'", Integer.class);
+        int audits = jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE entity_type='PARENT_CHILD' AND action='REVERT'", Integer.class);
         mvc.perform(post("/api/v1/audit/" + lastAudit("PARENT_CHILD", "DELETE", linkId) + "/revert").header("Authorization", a))
            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("RELATION_CYCLE"));
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE action='REVERT'", Integer.class)).isEqualTo(audits);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE entity_type='PARENT_CHILD' AND action='REVERT'", Integer.class)).isEqualTo(audits);
     }
 
     @Test
@@ -160,6 +167,76 @@ class RevertApiTest {
            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_REVERTIBLE"));
         jdbc.update("INSERT INTO audit_log(entity_type, entity_id, action) VALUES ('PERSON', ?, 'SET_PHOTO')", ids.c());
         mvc.perform(post("/api/v1/audit/" + lastAudit("PERSON", "SET_PHOTO", ids.c()) + "/revert").header("Authorization", a))
+           .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_REVERTIBLE"));
+    }
+
+    @Test
+    void profileRevertKeepsPhotoKeyAndRejectsSoftDeletedPerson() throws Exception {
+        var ids = fixture.create();
+        String a = admin();
+        long v = jdbc.queryForObject("SELECT version FROM person WHERE id=?", Long.class, ids.a1());
+        mvc.perform(put("/api/v1/persons/" + ids.a1()).header("Authorization", a).contentType(JSON)
+            .content("{\"fullName\":\"Đổi Tên\",\"gender\":\"M\",\"alive\":true,\"version\":" + v + "}")).andExpect(status().isOk());
+        long upd = lastAudit("PERSON", "UPDATE", ids.a1());
+        em.flush();
+        jdbc.update("UPDATE person SET photo_key='photos/x.jpg' WHERE id=?", ids.a1());
+        em.clear();
+        mvc.perform(post("/api/v1/audit/" + upd + "/revert").header("Authorization", a)).andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT photo_key FROM person WHERE id=?", String.class, ids.a1())).isEqualTo("photos/x.jpg");
+        assertThat(jdbc.queryForObject("SELECT deleted_at IS NULL FROM person WHERE id=?", Boolean.class, ids.a1())).isTrue();
+
+        mvc.perform(delete("/api/v1/persons/" + ids.a1()).header("Authorization", a)).andExpect(status().isNoContent());
+        mvc.perform(post("/api/v1/audit/" + upd + "/revert").header("Authorization", a))
+           .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_REVERTIBLE"));
+    }
+
+    @Test
+    void revertUnionCreateRemovesUnion() throws Exception {
+        var ids = fixture.create();
+        String a = admin();
+        long wife = jdbc.queryForObject("INSERT INTO person(full_name, gender) VALUES ('Vợ','F') RETURNING id", Long.class);
+        String resp = mvc.perform(post("/api/v1/relations/unions").header("Authorization", a).contentType(JSON)
+            .content("{\"partnerAId\":" + ids.c() + ",\"partnerBId\":" + wife + "}")).andReturn().getResponse().getContentAsString();
+        long uid = om.readTree(resp).get("id").asLong();
+        long createAudit = lastAudit("UNION", "CREATE", uid);
+        mvc.perform(post("/api/v1/audit/" + createAudit + "/revert").header("Authorization", a)).andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM union_rel WHERE id=?", Integer.class, uid)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE entity_type='UNION' AND action='REVERT' AND entity_id=?", Integer.class, uid)).isEqualTo(1);
+        mvc.perform(post("/api/v1/audit/" + createAudit + "/revert").header("Authorization", a))
+           .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_REVERTIBLE"));
+    }
+
+    @Test
+    void doubleRevertOfUnionDeleteDoesNotDuplicate() throws Exception {
+        var ids = fixture.create();
+        String a = admin();
+        long wife = jdbc.queryForObject("INSERT INTO person(full_name, gender) VALUES ('Vợ','F') RETURNING id", Long.class);
+        for (String status : new String[] {"MARRIED", "DIVORCED"}) {
+            long w = status.equals("MARRIED") ? wife : jdbc.queryForObject("INSERT INTO person(full_name, gender) VALUES ('Vợ2','F') RETURNING id", Long.class);
+            String resp = mvc.perform(post("/api/v1/relations/unions").header("Authorization", a).contentType(JSON)
+                .content("{\"partnerAId\":" + ids.c() + ",\"partnerBId\":" + w + ",\"status\":\"" + status + "\",\"startDate\":\"1960-01-01\"}"))
+                .andReturn().getResponse().getContentAsString();
+            long uid = om.readTree(resp).get("id").asLong();
+            mvc.perform(delete("/api/v1/relations/unions/" + uid).header("Authorization", a)).andExpect(status().isNoContent());
+            long del = lastAudit("UNION", "DELETE", uid);
+            mvc.perform(post("/api/v1/audit/" + del + "/revert").header("Authorization", a)).andExpect(status().isNoContent());
+            mvc.perform(post("/api/v1/audit/" + del + "/revert").header("Authorization", a))
+               .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_REVERTIBLE"));
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM union_rel WHERE partner_a_id=? AND partner_b_id=?", Integer.class, ids.c(), w)).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void missingSnapshotIsNotRevertibleNever500() throws Exception {
+        var ids = fixture.create();
+        String a = admin();
+        for (String[] t : new String[][] {{"PERSON", "UPDATE"}, {"PARENT_CHILD", "DELETE"}, {"UNION", "DELETE"}, {"UNION", "UPDATE"}}) {
+            long id = jdbc.queryForObject("INSERT INTO audit_log(entity_type, entity_id, action) VALUES (?, ?, ?) RETURNING id", Long.class, t[0], ids.c(), t[1]);
+            mvc.perform(post("/api/v1/audit/" + id + "/revert").header("Authorization", a))
+               .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_REVERTIBLE"));
+        }
+        long bad = jdbc.queryForObject("INSERT INTO audit_log(entity_type, entity_id, action, before_data) VALUES ('PERSON', ?, 'UPDATE', '{\"gender\":\"ZZ\",\"birthDate\":\"xx\"}'::jsonb) RETURNING id", Long.class, ids.c());
+        mvc.perform(post("/api/v1/audit/" + bad + "/revert").header("Authorization", a))
            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_REVERTIBLE"));
     }
 }
