@@ -230,13 +230,30 @@ class RevertApiTest {
     void missingSnapshotIsNotRevertibleNever500() throws Exception {
         var ids = fixture.create();
         String a = admin();
-        for (String[] t : new String[][] {{"PERSON", "UPDATE"}, {"PARENT_CHILD", "DELETE"}, {"UNION", "DELETE"}, {"UNION", "UPDATE"}}) {
-            long id = jdbc.queryForObject("INSERT INTO audit_log(entity_type, entity_id, action) VALUES (?, ?, ?) RETURNING id", Long.class, t[0], ids.c(), t[1]);
+        long wife = jdbc.queryForObject("INSERT INTO person(full_name, gender) VALUES ('Vợ','F') RETURNING id", Long.class);
+        String resp = mvc.perform(post("/api/v1/relations/unions").header("Authorization", a).contentType(JSON)
+            .content("{\"partnerAId\":" + ids.c() + ",\"partnerBId\":" + wife + "}")).andReturn().getResponse().getContentAsString();
+        long uid = om.readTree(resp).get("id").asLong();
+        long[][] ents = {{0, ids.c()}, {1, linkIdOf(ids)}, {2, uid}, {3, uid}};
+        String[][] types = {{"PERSON", "UPDATE"}, {"PARENT_CHILD", "DELETE"}, {"UNION", "DELETE"}, {"UNION", "UPDATE"}};
+        for (int i = 0; i < types.length; i++) {
+            long id = jdbc.queryForObject("INSERT INTO audit_log(entity_type, entity_id, action) VALUES (?, ?, ?) RETURNING id", Long.class, types[i][0], ents[i][1], types[i][1]);
             mvc.perform(post("/api/v1/audit/" + id + "/revert").header("Authorization", a))
+               .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_REVERTIBLE"));
+        }
+        // snapshot hôn phối thiếu "order" (có đủ partners/status)
+        for (String act : new String[] {"UPDATE", "DELETE"}) {
+            long noOrder = jdbc.queryForObject("INSERT INTO audit_log(entity_type, entity_id, action, before_data) VALUES ('UNION', ?, ?, ?::jsonb) RETURNING id", Long.class,
+                uid, act, "{\"partnerAId\":" + ids.a() + ",\"partnerBId\":" + wife + ",\"status\":\"MARRIED\"}");
+            mvc.perform(post("/api/v1/audit/" + noOrder + "/revert").header("Authorization", a))
                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_REVERTIBLE"));
         }
         long bad = jdbc.queryForObject("INSERT INTO audit_log(entity_type, entity_id, action, before_data) VALUES ('PERSON', ?, 'UPDATE', '{\"gender\":\"ZZ\",\"birthDate\":\"xx\"}'::jsonb) RETURNING id", Long.class, ids.c());
         mvc.perform(post("/api/v1/audit/" + bad + "/revert").header("Authorization", a))
            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_REVERTIBLE"));
+    }
+
+    long linkIdOf(vn.giapha.support.TreeFixture.Ids ids) {
+        return jdbc.queryForObject("SELECT id FROM parent_child WHERE parent_id=? AND child_id=?", Long.class, ids.a(), ids.a1());
     }
 }

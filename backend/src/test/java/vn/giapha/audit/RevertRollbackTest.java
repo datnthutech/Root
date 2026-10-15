@@ -21,7 +21,7 @@ import vn.giapha.auth.Role;
 import vn.giapha.support.TestUsers;
 import vn.giapha.support.TreeFixture;
 
-/** Không dùng @Transactional ở lớp test: mỗi request commit/rollback thật, chứng minh revert lỗi không để lại dấu vết. */
+/** Không dùng @Transactional ở lớp test (commit thật): chứng minh revert bị từ chối không đổi trạng thái, không ghi dòng REVERT, và lỗi giữa chừng được rollback. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({PostgresTestConfig.class, TestUsers.class, TreeFixture.class})
@@ -42,7 +42,7 @@ class RevertRollbackTest {
     long count(String sql, Object... args) { return jdbc.queryForObject(sql, Long.class, args); }
 
     @Test
-    void failedRevertLeavesStateUnchangedAndWritesNoRevertRow() throws Exception {
+    void rejectedRevertLeavesStateUnchangedAndWritesNoRevertRow() throws Exception {
         var ids = tx.execute(s -> fixture.create());
         String a = users.bearer(Role.ADMIN);
 
@@ -62,7 +62,7 @@ class RevertRollbackTest {
     }
 
     @Test
-    void cycleRevertIsRolledBackWithNoChange() throws Exception {
+    void rejectedCycleRevertLeavesStateUnchanged() throws Exception {
         var ids = tx.execute(s -> fixture.create());
         String a = users.bearer(Role.ADMIN);
         long linkId = count("SELECT id FROM parent_child WHERE parent_id=? AND child_id=?", ids.g(), ids.a());
@@ -76,6 +76,25 @@ class RevertRollbackTest {
            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("RELATION_CYCLE"));
         assertThat(count("SELECT count(*) FROM parent_child")).isEqualTo(links);
         assertThat(count("SELECT count(*) FROM clan_member")).isEqualTo(members);
+        assertThat(count("SELECT count(*) FROM audit_log")).isEqualTo(audits);
+        assertThat(count("SELECT count(*) FROM audit_log WHERE action='REVERT'")).isZero();
+    }
+
+    @Test
+    void failureAfterPartialWritesRollsBackUnionAndRevertRow() throws Exception {
+        var ids = tx.execute(s -> fixture.create());
+        String a = users.bearer(Role.ADMIN);
+        long wife = jdbc.queryForObject("INSERT INTO person(full_name, gender) VALUES ('Vợ','F') RETURNING id", Long.class);
+        String resp = mvc.perform(post("/api/v1/relations/unions").header("Authorization", a).contentType(JSON)
+            .content("{\"partnerAId\":" + ids.c() + ",\"partnerBId\":" + wife + "}")).andReturn().getResponse().getContentAsString();
+        long uid = om.readTree(resp).get("id").asLong();
+        mvc.perform(delete("/api/v1/relations/unions/" + uid).header("Authorization", a)).andExpect(status().isNoContent());
+        long delAudit = count("SELECT id FROM audit_log WHERE entity_type='UNION' AND action='DELETE' AND entity_id=?", uid);
+        // làm bước dựng lại clan_member (sau khi union đã tạo và dòng REVERT đã ghi) thất bại
+        jdbc.update("UPDATE clan SET founder_person_id = NULL WHERE id=?", ids.clan());
+        long audits = count("SELECT count(*) FROM audit_log");
+        mvc.perform(post("/api/v1/audit/" + delAudit + "/revert").header("Authorization", a)).andExpect(status().isConflict());
+        assertThat(count("SELECT count(*) FROM union_rel WHERE partner_a_id=? AND partner_b_id=?", ids.c(), wife)).isZero();
         assertThat(count("SELECT count(*) FROM audit_log")).isEqualTo(audits);
         assertThat(count("SELECT count(*) FROM audit_log WHERE action='REVERT'")).isZero();
     }

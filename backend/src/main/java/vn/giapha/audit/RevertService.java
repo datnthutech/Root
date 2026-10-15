@@ -100,7 +100,7 @@ public class RevertService {
             case "UPDATE" -> {
                 UnionRel u = unionRepo.findById(r.entityId()).orElseThrow(() -> notRevertible("Hôn phối này đã bị gỡ"));
                 var before = Snapshots.of(u);
-                UnionSnapView s = om.convertValue(requireObject(r.before()), UnionSnapView.class);
+                UnionSnapView s = om.convertValue(requireUnionSnap(r.before()), UnionSnapView.class);
                 unions.update(u.getId(), s.order(), s.status(), null, null);
                 UnionRel fresh = unionRepo.findById(u.getId()).orElseThrow();
                 fresh.setStartDate(s.startDate());
@@ -109,7 +109,7 @@ public class RevertService {
                 audit.record(me.id(), "UNION", u.getId(), "REVERT", before, Snapshots.of(fresh));
             }
             case "DELETE" -> {
-                UnionSnapView s = om.convertValue(requireObject(r.before()), UnionSnapView.class);
+                UnionSnapView s = om.convertValue(requireUnionSnap(r.before()), UnionSnapView.class);
                 if (s.partnerAId() == null || s.partnerBId() == null || s.status() == null) throw notRevertible("Dữ liệu lịch sử không hợp lệ");
                 Integer dup = jdbc.queryForObject("""
                     SELECT count(*) FROM union_rel WHERE status = ? AND start_date IS NOT DISTINCT FROM ?::date
@@ -135,6 +135,12 @@ public class RevertService {
     private JsonNode parse(String s) {
         if (s == null) return null;
         try { return om.readTree(s); } catch (JsonProcessingException e) { return null; }
+    }
+
+    private JsonNode requireUnionSnap(JsonNode n) {
+        requireObject(n);
+        if (!n.hasNonNull("order") || !n.get("order").isInt()) throw notRevertible("Dữ liệu lịch sử không hợp lệ");
+        return n;
     }
 
     private JsonNode requireObject(JsonNode n) {
