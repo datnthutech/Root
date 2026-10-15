@@ -16,7 +16,7 @@ export default function AdminUsersPage() {
   const mut = useMutation({
     mutationFn: (a: { id: number; patch: Parameters<typeof adminUsersApi.update>[1] }) => adminUsersApi.update(a.id, a.patch),
     onSuccess: () => { message.success('Đã cập nhật'); qc.invalidateQueries({ queryKey: ['admin-users'] }) },
-    onError: (e) => message.error(errorText((e as { code?: string }).code)),
+    onError: (e) => message.error(errorText(e)),
   })
 
   return (

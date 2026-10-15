@@ -44,7 +44,7 @@ export default function ImportPage() {
           void qc.invalidateQueries({ queryKey: [k] })
       }
     } catch (e) {
-      message.error(errorText((e as { code?: string }).code))
+      message.error(errorText(e))
     } finally {
       busyRef.current = false
       setBusy(false)
@@ -55,7 +55,7 @@ export default function ImportPage() {
   return (
     <div style={{ padding: 16, maxWidth: 960, margin: '0 auto' }}>
       <Space direction="vertical" style={{ width: '100%' }} size="middle">
-        <Button onClick={async () => { try { await importApi.downloadTemplate() } catch (e) { message.error(errorText((e as { code?: string }).code)) } }}>Tải mẫu Excel</Button>
+        <Button onClick={async () => { try { await importApi.downloadTemplate() } catch (e) { message.error(errorText(e)) } }}>Tải mẫu Excel</Button>
         <Upload.Dragger accept=".xlsx" maxCount={1} disabled={busy} showUploadList={!!file} beforeUpload={(f) => { setFile(f as File); return false }}
           onRemove={() => { setFile(null) }}>
           <p className="ant-upload-drag-icon"><InboxOutlined /></p>

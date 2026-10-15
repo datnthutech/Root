@@ -39,12 +39,12 @@ export default function PersonDialog({ personId, onClose, onNavigate, onTreeChan
       close()
       onTreeChanged()
     } catch (e) {
-      message.error(errorText((e as { code?: string }).code))
+      message.error(errorText(e))
     }
   }
 
   const wrap = (q: { isLoading: boolean; error: unknown; data?: unknown }, node: () => React.ReactNode) =>
-    !enabled ? null : q.isLoading || (!q.error && q.data === undefined) ? <Spin /> : q.error ? <Alert type="error" message={errorText((q.error as { code?: string }).code)} /> : node()
+    !enabled ? null : q.isLoading || (!q.error && q.data === undefined) ? <Spin /> : q.error ? <Alert type="error" message={errorText(q.error)} /> : node()
 
   return (
     <>

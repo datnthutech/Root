@@ -13,7 +13,7 @@ export default function LoginPage() {
   const onFinish = async (v: { username: string; password: string }) => {
     setBusy(true); setError(null)
     try { await login(v.username, v.password); navigate('/', { replace: true }) }
-    catch (e) { setError(errorText((e as { code?: string }).code)) }
+    catch (e) { setError(errorText(e)) }
     finally { setBusy(false) }
   }
 

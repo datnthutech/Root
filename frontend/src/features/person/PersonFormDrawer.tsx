@@ -48,9 +48,8 @@ function DrawerContent({ open, mode, person, onSaved }: Props) {
       qc.removeQueries({ queryKey: bioKey })
       onSaved(saved)
     } catch (e) {
-      const code = (e as { code?: string }).code
-      if (code === 'VERSION_CONFLICT') setConflict(true)
-      message.error(errorText(code))
+      if ((e as { code?: string }).code === 'VERSION_CONFLICT') setConflict(true)
+      message.error(errorText(e))
     } finally {
       setBusy(false)
     }
@@ -65,7 +64,7 @@ function DrawerContent({ open, mode, person, onSaved }: Props) {
       setConflict(false)
       setFormKey((k) => k + 1)
     } catch (e) {
-      message.error(errorText((e as { code?: string }).code))
+      message.error(errorText(e))
     } finally {
       setReloading(false)
     }

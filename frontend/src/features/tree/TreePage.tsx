@@ -70,7 +70,7 @@ export default function TreePage() {
     if (myPerson === null && clans.isSuccess && clans.data.length === 0) {
       return <Empty style={{ marginTop: '20vh' }} description="Chưa có dòng họ nào. Quản trị viên cần tạo dòng họ và chọn thủy tổ." />
     }
-    if (clans.isError) return <Alert type="error" message={errorText((clans.error as { code?: string }).code)} style={{ margin: 16 }} />
+    if (clans.isError) return <Alert type="error" message={errorText(clans.error)} style={{ margin: 16 }} />
     return <Spin style={{ display: 'block', margin: '20vh auto' }} />
   }
 
@@ -86,7 +86,7 @@ export default function TreePage() {
             onFit={() => canvas.current?.fit()} onAddPerson={hasRole(user, 'EDITOR') ? () => setCreating(true) : undefined} />
         </div>
       </div>
-      {data.error && <Alert type="error" showIcon style={{ position: 'absolute', top: 64, left: 8 }} message={errorText(data.error.code)} />}
+      {data.error && <Alert type="error" showIcon style={{ position: 'absolute', top: 64, left: 8 }} message={errorText(data.error)} />}
       {data.loading && <Spin style={{ position: 'absolute', top: '50%', left: '50%' }} />}
       <div style={{ position: 'absolute', right: 8, bottom: 8 }}>
         <Minimap layout={data.layout} view={view} onNavigate={(x, y) => canvas.current?.moveCenterTo(x, y)} />

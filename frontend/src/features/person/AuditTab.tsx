@@ -21,7 +21,7 @@ export default function AuditTab({ personId, canRevert, onReverted }: { personId
       await qc.invalidateQueries({ queryKey: ['audit', personId] })
       onReverted()
     } catch (e) {
-      message.error(errorText((e as { code?: string }).code))
+      message.error(errorText(e))
     }
   }
 

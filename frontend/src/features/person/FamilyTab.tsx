@@ -34,7 +34,7 @@ export default function FamilyTab({ f, personId, personName, personGender, canMa
   const closeDrawer = () => setDrawer((d) => ({ ...d, open: false }))
 
   const act = async (fn: () => Promise<unknown>) => {
-    try { await fn(); onChanged() } catch (e) { message.error(errorText((e as { code?: string }).code)) }
+    try { await fn(); onChanged() } catch (e) { message.error(errorText(e)) }
   }
   const removeLink = (r: PersonRef) => !canManage || r.linkId === null ? null : (
     <Popconfirm title="Gỡ quan hệ này?" okText="Gỡ" cancelText="Huỷ" onConfirm={() => act(() => editApi.removeParentChild(r.linkId!))}>

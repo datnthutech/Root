@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { App, Button, Drawer, Radio, Select, Space, Tabs, Typography } from 'antd'
+import { Alert, App, Button, Drawer, Radio, Select, Space, Tabs, Typography } from 'antd'
 import { editApi, type LinkBody } from '../../api/edit'
 import type { SpouseFamily } from '../../api/person'
 import { errorText } from '../../auth/errorText'
@@ -17,6 +17,8 @@ export default function RelationDrawer({ open, mode, person, spouses, onClose, o
   const [busy, setBusy] = useState(false)
   const [picked, setPicked] = useState<number | null>(null)
   const [kind, setKind] = useState<'BIOLOGICAL' | 'ADOPTED' | 'STEP'>('BIOLOGICAL')
+  const [tab, setTab] = useState('existing')
+  const [createdId, setCreatedId] = useState<number | null>(null)
   const [unionId, setUnionId] = useState<number | undefined>(spouses[0]?.unionId)
 
   const attach = async (otherId: number) => {
@@ -32,15 +34,23 @@ export default function RelationDrawer({ open, mode, person, spouses, onClose, o
     }
   }
 
-  const run = async (otherId: () => Promise<number>) => {
+  const run = async (otherId: () => Promise<number>, isNew = false) => {
     if (busy) return
     setBusy(true)
+    let id: number | null = null
     try {
-      await attach(await otherId())
+      id = await otherId()
+      await attach(id)
       message.success('Đã cập nhật quan hệ')
       onDone()
     } catch (e) {
-      message.error(errorText((e as { code?: string }).code))
+      if (isNew && id !== null) {
+        // người mới đã được tạo nhưng chưa gắn được: chuyển sang tab "Người đã có" để thử lại, không tạo trùng
+        setPicked(id); setCreatedId(id); setTab('existing')
+        message.error(`Đã tạo người mới (#${id}) nhưng chưa gắn được quan hệ: ${errorText(e)}. Bấm "${TITLE[mode]}" để thử lại.`)
+      } else {
+        message.error(errorText(e))
+      }
     } finally {
       setBusy(false)
     }
@@ -60,12 +70,15 @@ export default function RelationDrawer({ open, mode, person, spouses, onClose, o
           )}
         </Space>
       )}
-      <Tabs items={[
+      <Tabs activeKey={tab} onChange={setTab} items={[
         {
           key: 'existing', label: 'Người đã có',
           children: (
             <Space direction="vertical" style={{ width: '100%' }}>
-              <PersonSearch onPick={(id) => setPicked(id)} />
+              {createdId !== null && (
+                <Alert type="warning" showIcon message={`Người mới (#${createdId}) đã được tạo nhưng chưa gắn quan hệ. Có thể thử lại bên dưới.`} />
+              )}
+              <PersonSearch onPick={(id) => { setPicked(id); setCreatedId(null) }} />
               {picked !== null && <Typography.Text>Đã chọn người có mã #{picked}</Typography.Text>}
               <Button type="primary" disabled={picked === null} loading={busy} onClick={() => run(async () => picked!)}>{TITLE[mode]}</Button>
             </Space>
@@ -75,7 +88,7 @@ export default function RelationDrawer({ open, mode, person, spouses, onClose, o
           key: 'new', label: 'Tạo người mới',
           children: (
             <PersonForm busy={busy} withBiography={false} defaultGender={defaultGender} submitText={`Tạo và ${TITLE[mode].toLowerCase()}`}
-              onSubmit={async (v) => { await run(async () => (await editApi.createPerson(v)).id) }} />
+              onSubmit={async (v) => { await run(async () => (await editApi.createPerson(v)).id, true) }} />
           ),
         },
       ]} />

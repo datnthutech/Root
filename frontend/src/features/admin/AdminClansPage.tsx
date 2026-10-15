@@ -16,7 +16,7 @@ export default function AdminClansPage() {
   const save = useMutation({
     mutationFn: (b: ClanBody) => (editing === 'new' ? adminClansApi.create(b) : adminClansApi.update((editing as ClanView).id, b)),
     onSuccess: () => { message.success('Đã lưu dòng họ'); setEditing(null); qc.invalidateQueries({ queryKey: ['admin-clans'] }); qc.invalidateQueries({ queryKey: ['clans'] }) },
-    onError: (e) => message.error(errorText((e as { code?: string }).code)),
+    onError: (e) => message.error(errorText(e)),
   })
 
   const open = (c: ClanView | 'new') => {

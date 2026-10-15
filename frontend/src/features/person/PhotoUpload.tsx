@@ -14,7 +14,7 @@ export default function PhotoUpload({ personId, onChanged }: { personId: number;
         setBusy(true)
         editApi.uploadPhoto(personId, file as File)
           .then(() => { message.success('Đã đổi ảnh'); onChanged() })
-          .catch((e) => message.error(errorText((e as { code?: string }).code)))
+          .catch((e) => message.error(errorText(e)))
           .finally(() => setBusy(false))
         return false
       }}>

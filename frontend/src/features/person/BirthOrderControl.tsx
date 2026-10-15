@@ -11,7 +11,7 @@ export default function BirthOrderControl({ personId, current, onChanged }: { pe
     if (busy) return
     setBusy(true)
     try { await editApi.setBirthOrder(personId, order); message.success('Đã đặt thứ tự'); onChanged() }
-    catch (e) { message.error(errorText((e as { code?: string }).code)) }
+    catch (e) { message.error(errorText(e)) }
     finally { setBusy(false) }
   }
   return (

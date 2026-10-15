@@ -1,4 +1,4 @@
-import { get, set } from 'idb-keyval'
+import { clear, get, set } from 'idb-keyval'
 import { http, rawFetch, toFailure } from './http'
 import type { GraphData } from '../lib/types'
 
@@ -9,6 +9,9 @@ export interface SearchHit { id: number; name: string; gender: 'M' | 'F' | 'U'; 
 
 async function safeGet<T>(key: string): Promise<T | undefined> { try { return await get<T>(key) } catch { return undefined } }
 async function safeSet(key: string, v: unknown) { try { await set(key, v) } catch { /* cache không bắt buộc */ } }
+
+/** Xoá bản lưu đồ thị (IndexedDB) khi đổi/đăng xuất người dùng. */
+export async function clearGraphCache() { try { await clear() } catch { /* cache không bắt buộc */ } }
 
 async function fetchGraph(path: string, cacheKey: string | null): Promise<LoadedGraph> {
   const cached = cacheKey ? await safeGet<LoadedGraph>(cacheKey) : undefined

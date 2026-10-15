@@ -12,7 +12,7 @@ export default function RegisterPage() {
   const onFinish = async (v: { username: string; password: string; displayName: string }) => {
     setBusy(true); setError(null)
     try { await authApi.register(v.username, v.password, v.displayName); setDone(true) }
-    catch (e) { setError(errorText((e as { code?: string }).code)) }
+    catch (e) { setError(errorText(e)) }
     finally { setBusy(false) }
   }
 

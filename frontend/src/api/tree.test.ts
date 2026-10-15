@@ -39,3 +39,16 @@ test('lỗi HTTP ném ApiFailure', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{"code":"NOT_FOUND","message":"x","details":null}', { status: 404 })))
   await expect(loadClanGraph(404, 'both')).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
 })
+
+test('clearGraphCache xoá bản lưu: lần sau không gửi If-None-Match', async () => {
+  const { clearGraphCache } = await import('./tree')
+  const seen: (string | null)[] = []
+  vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => {
+    seen.push(new Headers(init.headers).get('If-None-Match'))
+    return new Response(JSON.stringify(graph), { status: 200, headers: { ETag: '"zzz"' } })
+  }))
+  await loadClanGraph(7, 'both')
+  await clearGraphCache()
+  await loadClanGraph(7, 'both')
+  expect(seen).toEqual([null, null])
+})
