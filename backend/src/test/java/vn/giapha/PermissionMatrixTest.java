@@ -81,6 +81,8 @@ class PermissionMatrixTest {
     @Autowired ObjectMapper om;
     @Autowired @org.springframework.beans.factory.annotation.Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping mappings;
 
+    static final Map<Role, Integer> RANK = Map.of(Role.VIEWER, 1, Role.EDITOR, 2, Role.ADMIN, 3);
+
     static final Pattern VAR = Pattern.compile("\\{[^}]+}");
     static String norm(String s) { return VAR.matcher(s).replaceAll("{}"); }
 
@@ -106,7 +108,7 @@ class PermissionMatrixTest {
             if (anon != 401) failures.add(e.method() + " " + e.path() + " ẩn danh -> " + anon + " (cần 401)");
             for (Role r : Role.values()) {
                 int s = mvc.perform(build(e, ids, users.bearer(r))).andReturn().getResponse().getStatus();
-                boolean allowed = r.ordinal() <= e.min().ordinal();   // ADMIN(0) > EDITOR(1) > VIEWER(2)
+                boolean allowed = RANK.get(r) >= RANK.get(e.min());
                 if (allowed && (s == 401 || s == 403)) failures.add(e.method() + " " + e.path() + " với " + r + " -> " + s + " (phải được phép)");
                 if (!allowed && s != 403) failures.add(e.method() + " " + e.path() + " với " + r + " -> " + s + " (cần 403)");
             }
@@ -119,27 +121,47 @@ class PermissionMatrixTest {
         for (String p : PUBLIC) {
             String[] parts = p.split(" ");
             var res = mvc.perform(request(HttpMethod.valueOf(parts[0]), "/api/v1" + parts[1]).contentType(MediaType.APPLICATION_JSON).content("{}")).andReturn().getResponse();
-            // refresh/login có thể trả 401 nghiệp vụ (không có cookie/sai mật khẩu); chỉ cấm 403 và 401 do bộ lọc bảo mật ("Cần đăng nhập").
+            // refresh/login có thể trả 401 nghiệp vụ; chỉ cấm 403 và 401 do bộ lọc bảo mật (có header WWW-Authenticate).
             assertThat(res.getStatus()).as(p).isNotEqualTo(403);
-            assertThat(res.getContentAsString()).as(p).doesNotContain("Cần đăng nhập");
+            assertThat(res.getHeader("WWW-Authenticate")).as(p).isNull();
         }
+    }
+
+    /** Mọi cặp "METHOD path" của các lớp vn.giapha. Mapping không khai báo method = mọi method (không thể được ma trận phủ hết). */
+    static Set<String> declaredEndpoints(Map<RequestMappingInfo, org.springframework.web.method.HandlerMethod> handlers) {
+        Set<String> declared = new TreeSet<>();
+        for (Map.Entry<RequestMappingInfo, org.springframework.web.method.HandlerMethod> en : handlers.entrySet()) {
+            if (!en.getValue().getBeanType().getPackageName().startsWith("vn.giapha")) continue;
+            Set<org.springframework.web.bind.annotation.RequestMethod> methods = en.getKey().getMethodsCondition().getMethods();
+            if (methods.isEmpty()) methods = EnumSet.allOf(org.springframework.web.bind.annotation.RequestMethod.class);
+            for (String pattern : en.getKey().getPathPatternsCondition().getPatternValues())
+                for (var m : methods) declared.add(m.name() + " " + norm(pattern.replaceFirst("^/api/v1", "")));
+        }
+        return declared;
+    }
+
+    @Test
+    void guardCatchesMappingWithoutExplicitMethod() throws Exception {
+        var info = RequestMappingInfo.paths("/api/v1/me").build();   // như @RequestMapping("/me") không có method=
+        var hm = new org.springframework.web.method.HandlerMethod(new vn.giapha.auth.MeController(null),
+            vn.giapha.auth.MeController.class.getMethod("me", vn.giapha.auth.AuthUser.class));
+        Set<String> declared = declaredEndpoints(Map.of(info, hm));
+        assertThat(declared).contains("GET /me", "POST /me", "DELETE /me");
+        Set<String> covered = MATRIX.stream().map(e -> e.method() + " " + norm(e.path())).collect(Collectors.toSet());
+        assertThat(covered.containsAll(declared)).as("guard phải coi mapping thiếu method là chưa được phủ").isFalse();
     }
 
     @Test
     void guardEveryDeclaredEndpointIsInTheMatrixAndInOpenApi() throws Exception {
-        Set<String> declared = new TreeSet<>();
-        for (Map.Entry<RequestMappingInfo, org.springframework.web.method.HandlerMethod> en : mappings.getHandlerMethods().entrySet()) {
-            if (!en.getValue().getBeanType().getPackageName().startsWith("vn.giapha")) continue;
-            var patterns = en.getKey().getPathPatternsCondition().getPatternValues();
-            for (String pattern : patterns) {
-                for (var m : en.getKey().getMethodsCondition().getMethods()) declared.add(m.name() + " " + norm(pattern.replaceFirst("^/api/v1", "")));
-            }
-        }
+        Set<String> declared = declaredEndpoints(mappings.getHandlerMethods());
         Set<String> covered = MATRIX.stream().map(e -> e.method() + " " + norm(e.path().replaceFirst("\\?.*$", ""))).collect(Collectors.toCollection(TreeSet::new));
         PUBLIC.forEach(p -> covered.add(p.split(" ")[0] + " " + norm(p.split(" ")[1])));
         Set<String> uncovered = new TreeSet<>(declared);
         uncovered.removeAll(covered);
         assertThat(uncovered).as("Endpoint chưa có trong ma trận quyền").isEmpty();
+        Set<String> stale = new TreeSet<>(covered);
+        stale.removeAll(declared);
+        assertThat(stale).as("Dòng ma trận không còn endpoint tương ứng").isEmpty();
 
         JsonNode paths = om.readTree(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/v3/api-docs"))
             .andReturn().getResponse().getContentAsString()).get("paths");

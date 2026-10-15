@@ -39,7 +39,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/relations/**").hasAnyRole("EDITOR", "ADMIN")
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
-                .authenticationEntryPoint((req, res, ex) -> write(om, res, 401, new ApiError("UNAUTHENTICATED", "Cần đăng nhập", null)))
+                .authenticationEntryPoint((req, res, ex) -> { res.setHeader("WWW-Authenticate", "Bearer"); write(om, res, 401, new ApiError("UNAUTHENTICATED", "Cần đăng nhập", null)); })
                 .accessDeniedHandler((req, res, ex) -> write(om, res, 403, new ApiError("FORBIDDEN", "Không đủ quyền", null))))
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
