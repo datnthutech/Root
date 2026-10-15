@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: giapha
+      POSTGRES_USER: giapha
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U giapha"]
+      interval: 10s
+      retries: 10
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes: ["miniodata:/data"]
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio: { condition: service_started }
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/giapha
+      DB_USER: giapha
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      COOKIE_SECURE: "true"
+      SWAGGER_ENABLED: "false"
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: giapha
+      BOOTSTRAP_ADMIN_USER: ${BOOTSTRAP_ADMIN_USER}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+  caddy:
+    build:
+      context: .
+      dockerfile: ops/caddy/Dockerfile
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes: ["caddy_data:/data", "caddy_config:/config"]
+  backup:
+    build: ./ops/backup
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PGHOST: postgres
+      PGUSER: giapha
+      PGDATABASE: giapha
+      PGPASSWORD: ${DB_PASSWORD}
+      RETENTION_DAYS: "14"
+    volumes:
+      - backups:/backups
+      - miniodata:/minio-data:ro
+volumes:
+  pgdata:
+  miniodata:
+  caddy_data:
+  caddy_config:
+  backups:

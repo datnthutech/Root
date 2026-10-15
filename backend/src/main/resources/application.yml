@@ -43,3 +43,8 @@ app:
     bucket: ${MINIO_BUCKET:giapha}
 management:
   endpoints.web.exposure.include: health
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
