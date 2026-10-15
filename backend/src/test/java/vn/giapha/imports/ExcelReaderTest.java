@@ -50,4 +50,50 @@ class ExcelReaderTest {
         assertThatThrownBy(() -> ExcelReader.read(new ByteArrayInputStream(x)))
             .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("VALIDATION_FAILED"));
     }
+
+    private static List<List<Object>> nRows(int n) {
+        var rows = new java.util.ArrayList<List<Object>>();
+        for (int i = 0; i < n; i++) rows.add(Arrays.asList("P" + i, "N"));
+        return rows;
+    }
+
+    @Test
+    void totalRowsAcrossSheetsIsCapped() {
+        byte[] x = new XlsxBuilder()
+            .sheet("Người", List.of("Mã", "Họ và tên"), nRows(ExcelReader.MAX_ROWS / 2 + 1))
+            .sheet("Quan hệ", List.of("Mã", "Họ và tên"), nRows(ExcelReader.MAX_ROWS / 2 + 1)).bytes();
+        assertThatThrownBy(() -> ExcelReader.read(new ByteArrayInputStream(x)))
+            .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void tooManySheetsIs400() {
+        var b = new XlsxBuilder();
+        for (int i = 0; i <= ExcelReader.MAX_SHEETS; i++) b.sheet("S" + i, List.of("Mã"), List.of(Arrays.asList("x")));
+        byte[] x = b.bytes();
+        assertThatThrownBy(() -> ExcelReader.read(new ByteArrayInputStream(x)))
+            .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void dateCellReadsAsIsoDate() {
+        byte[] x = new XlsxBuilder().sheet("Người", List.of("Mã", "Ngày sinh"), List.of(Arrays.asList("P1", LocalDate.of(1999, 12, 31)))).bytes();
+        assertThat(ExcelReader.read(new ByteArrayInputStream(x)).get("nguoi").rows().get(0).cells().get("ngaysinh")).isEqualTo("1999-12-31");
+    }
+
+    @Test
+    void erroredOrUnsupportedFormulaDoesNotRejectFile() {
+        byte[] x = new XlsxBuilder().sheet("Người", List.of("Mã", "A", "B", "C"),
+            List.of(Arrays.asList("P1", "=1/0", "=[1]Sheet1!A1", "=NOSUCHFUNC(1)"))).bytes();
+        var cells = ExcelReader.read(new ByteArrayInputStream(x)).get("nguoi").rows().get(0).cells();
+        assertThat(cells.get("ma")).isEqualTo("P1");
+        assertThat(cells.get("a")).isEmpty();
+        assertThat(cells).containsKeys("b", "c");
+    }
+
+    @Test
+    void duplicateHeaderLastColumnWins() {
+        byte[] x = new XlsxBuilder().sheet("Người", List.of("Mã", "Tên", "Tên"), List.of(Arrays.asList("P1", "first", "second"))).bytes();
+        assertThat(ExcelReader.read(new ByteArrayInputStream(x)).get("nguoi").rows().get(0).cells().get("ten")).isEqualTo("second");
+    }
 }
