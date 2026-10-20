@@ -17,7 +17,7 @@ services:
   # Kho ảnh tương thích S3. Dùng RustFS vì minio/minio đã bị gỡ khỏi Docker Hub.
   # Giữ tên service "minio" để backend/biến MINIO_* không phải đổi.
   minio:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:1.0.3
     restart: unless-stopped
     environment:
       RUSTFS_ACCESS_KEY: minioadmin
@@ -39,6 +39,8 @@ services:
       JWT_SECRET: local-dev-secret-local-dev-secret-0123456789
       COOKIE_SECURE: "false"
       SWAGGER_ENABLED: "true"
+      # Local: mọi request đi qua cùng một IP gateway của Docker nên hạn mức theo IP là của chung cả máy -> mặc định tắt.
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-false}
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin

@@ -23,7 +23,7 @@ elif [ ! -d "$MINIO_DATA_DIR" ]; then
   exit 1
 else
   rc=0
-  tar --exclude=./.minio.sys/tmp -C "$MINIO_DATA_DIR" -czf "$BACKUP_DIR/photos-$ts.tar.gz.tmp" . || rc=$?
+  tar --exclude=./.minio.sys/tmp --exclude=./.rustfs.sys/tmp -C "$MINIO_DATA_DIR" -czf "$BACKUP_DIR/photos-$ts.tar.gz.tmp" . || rc=$?
   if [ "$rc" -eq 1 ]; then
     echo "[$(date -u +%FT%TZ)] CẢNH BÁO: tar báo tệp thay đổi khi đọc (exit 1), vẫn chấp nhận" >&2
   elif [ "$rc" -ge 2 ]; then
