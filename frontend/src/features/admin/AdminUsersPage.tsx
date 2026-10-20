@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, InputNumber, Select, Space, Table, Tag } from 'antd'
+import { App, Button, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from 'antd'
 import { adminUsersApi, type AdminUser, type UserStatus } from '../../api/adminUsers'
 import type { Role } from '../../api/auth'
 import { errorText } from '../../auth/errorText'
@@ -13,6 +13,13 @@ export default function AdminUsersPage() {
   const { message } = App.useApp()
   const [filter, setFilter] = useState<UserStatus | undefined>('PENDING')
   const { data = [], isLoading } = useQuery({ queryKey: ['admin-users', filter], queryFn: () => adminUsersApi.list(filter) })
+  const [resetFor, setResetFor] = useState<AdminUser | null>(null)
+  const [resetForm] = Form.useForm<{ newPassword: string }>()
+  const resetMut = useMutation({
+    mutationFn: (a: { id: number; newPassword: string }) => adminUsersApi.resetUserPassword(a.id, a.newPassword),
+    onSuccess: () => { message.success('Đã đặt lại mật khẩu'); setResetFor(null) },
+    onError: (e) => message.error(errorText(e)),
+  })
   const mut = useMutation({
     mutationFn: (a: { id: number; patch: Parameters<typeof adminUsersApi.update>[1] }) => adminUsersApi.update(a.id, a.patch),
     onSuccess: () => { message.success('Đã cập nhật'); qc.invalidateQueries({ queryKey: ['admin-users'] }) },
@@ -42,8 +49,17 @@ export default function AdminUsersPage() {
             <Space>
               {row.status !== 'ACTIVE' && <Button size="small" type="primary" onClick={() => mut.mutate({ id: row.id, patch: { status: 'ACTIVE' } })}>{row.status === 'PENDING' ? 'Duyệt' : 'Mở khoá'}</Button>}
               {row.status === 'ACTIVE' && <Button size="small" danger onClick={() => mut.mutate({ id: row.id, patch: { status: 'LOCKED' } })}>Khoá</Button>}
+              <Button size="small" onClick={() => { resetForm.resetFields(); setResetFor(row) }}>Đặt lại mật khẩu</Button>
             </Space>) },
         ]} />
+      <Modal title={`Đặt lại mật khẩu: ${resetFor?.username ?? ''}`} open={resetFor !== null} okText="Đặt lại" cancelText="Huỷ"
+        confirmLoading={resetMut.isPending} onCancel={() => setResetFor(null)} onOk={() => resetForm.submit()} destroyOnHidden forceRender>
+        <Form form={resetForm} layout="vertical" onFinish={(v) => resetFor && resetMut.mutate({ id: resetFor.id, newPassword: v.newPassword })}>
+          <Form.Item name="newPassword" label="Mật khẩu mới" rules={[{ required: true, message: 'Nhập mật khẩu mới' }, { min: 8, message: 'Tối thiểu 8 ký tự' }]}>
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }

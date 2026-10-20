@@ -14,6 +14,7 @@ const TEXT: Record<string, string> = {
   IMPORT_INVALID: 'Tệp có lỗi, chưa nhập gì cả',
   PAYLOAD_TOO_LARGE: 'Tệp quá lớn',
   EDIT_WINDOW_EXPIRED: 'Đã quá 24 giờ, chỉ quản trị viên được sửa',
+  TOO_MANY_REQUESTS: 'Thao tác quá nhiều lần, vui lòng thử lại sau',
 }
 /** Các mã mà message của server cụ thể hơn câu chung (vd. "Đã có cha ruột"). */
 const PREFER_SERVER_MESSAGE = new Set(['RELATION_INVALID', 'NOT_REVERTIBLE', 'VALIDATION_FAILED'])

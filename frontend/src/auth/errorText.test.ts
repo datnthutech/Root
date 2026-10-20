@@ -17,3 +17,6 @@ test('PAYLOAD_TOO_LARGE và mã lạ', () => {
   expect(errorText({ code: 'PAYLOAD_TOO_LARGE' })).toBe('Tệp quá lớn')
   expect(errorText(undefined)).toBe('Đã có lỗi xảy ra, vui lòng thử lại')
 })
+test('TOO_MANY_REQUESTS', () => {
+  expect(errorText({ code: 'TOO_MANY_REQUESTS' })).toBe('Thao tác quá nhiều lần, vui lòng thử lại sau')
+})

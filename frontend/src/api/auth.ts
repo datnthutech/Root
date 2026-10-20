@@ -17,5 +17,7 @@ export const authApi = {
   },
   register: (username: string, password: string, displayName: string) =>
     http<{ id: number; status: string }>('/auth/register', { method: 'POST', body: JSON.stringify({ username, password, displayName }) }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    http<void>('/me/password', { method: 'PUT', body: JSON.stringify({ currentPassword, newPassword }) }),
   logout: () => http<void>('/auth/logout', { method: 'POST' }),
 }
