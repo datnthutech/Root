@@ -134,7 +134,7 @@ Ba vai trò: `VIEWER` (cấp thấp), `EDITOR` (cấp trung), `ADMIN` (cấp cao
 | Quản lý tài khoản (`/admin/**`), nhập Excel (`/import/**`) | không | không | có |
 
 ## 10b. Mật khẩu và chặn đăng nhập dò mật khẩu
-- **Người dùng tự đổi mật khẩu**: `PUT /api/v1/me/password` (cần mật khẩu hiện tại). Giao diện: nút "Đổi mật khẩu" ở thanh trên cùng, cạnh "Đăng xuất".
+- **Người dùng tự đổi mật khẩu**: `PUT /api/v1/me/password` (cần mật khẩu hiện tại). Giao diện: nút "Đổi mật khẩu" ở thanh trên cùng, cạnh "Đăng xuất"; sau khi đổi thành công, giao diện tự đăng xuất và chuyển về trang đăng nhập.
 - **Admin đặt lại mật khẩu hộ**: `PUT /api/v1/admin/users/{id}/password`. Giao diện: Admin → Quản lý tài khoản → "Đặt lại mật khẩu". Thao tác này tự **mở khoá** tài khoản và xoá bộ đếm sai mật khẩu.
 - Cả hai trường hợp đều **thu hồi toàn bộ refresh token** của người đó: các thiết bị đang đăng nhập sẽ bị đẩy ra trong vòng tối đa 15 phút (hết hạn access token).
 - **Khoá tạm tài khoản**: sai mật khẩu 5 lần → khoá 15 phút, trả `ACCOUNT_LOCKED` (423). Đăng nhập đúng sẽ xoá bộ đếm. Trong lúc đang khoá, người gõ sai mật khẩu chỉ nhận 401 (không tiết lộ là tài khoản đang bị khoá).
@@ -159,7 +159,7 @@ Ba vai trò: `VIEWER` (cấp thấp), `EDITOR` (cấp trung), `ADMIN` (cấp cao
 - Chặn tần suất đăng nhập đếm **theo IP trong bộ nhớ của backend**: mất khi khởi động lại và không chia sẻ giữa nhiều bản backend (hiện chỉ chạy 1 bản nên chấp nhận được).
 - IP dùng để đếm lấy từ `X-Forwarded-For` do Caddy **ghi đè** (`header_up X-Forwarded-For {remote_host}`). Giả định: **Caddy là proxy duy nhất đứng trước backend**. Nếu sau này đặt CDN/cân bằng tải phía trước Caddy thì mọi người dùng sẽ mang cùng một IP (của CDN) và chung hạn mức — khi đó phải đổi sang lấy IP theo số chặng proxy tin cậy.
 - Kho ảnh: image `rustfs/rustfs:1.0.3` (đã ghim; thay cho `minio/minio` đã bị gỡ khỏi Docker Hub), chưa có healthcheck; chưa chạy thử ảnh trên máy chủ thật.
-- Các image `node:22`, `caddy:2`, `postgres:16` dùng tag trôi; Caddy chạy root; `backend` chưa có healthcheck. (CSP và `Permissions-Policy` đã có trong `ops/caddy/Caddyfile`; CSP còn `'unsafe-eval'` cho PixiJS và `'unsafe-inline'` cho style của Ant Design.)
+- Các image `node:22`, `caddy:2`, `postgres:16` dùng tag trôi; Caddy chạy root; `backend` chưa có healthcheck. (CSP và `Permissions-Policy` đã có trong `ops/caddy/Caddyfile`; CSP còn `'unsafe-inline'` cho style của Ant Design.)
 - Sao lưu mặc định nằm cùng máy chủ; chưa có sao lưu ngoài máy (mục 7).
 - Cây 2.000 người khi mở lần đầu chỉ bố cục phần đang mở (đo cục bộ: 18/2000 nút), nên "thời gian mở cây" đo ở trạng thái thu gọn.
 - Hiệu năng vẽ cây 10.000 nút (M1: ≥ 55 fps, hover) chưa được đo trên phần cứng thật (xem `docs/reports/M1-render-prototype.md`).

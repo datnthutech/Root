@@ -6,9 +6,9 @@ import { authApi } from '../api/auth'
 
 vi.mock('../api/auth', () => ({ authApi: { changePassword: vi.fn() } }))
 
-const wrap = (onClose = vi.fn()) => {
-  render(<AntApp><ChangePasswordModal open onClose={onClose} /></AntApp>)
-  return onClose
+const wrap = (onClose = vi.fn(), onChanged = vi.fn()) => {
+  render(<AntApp><ChangePasswordModal open onClose={onClose} onChanged={onChanged} /></AntApp>)
+  return { onClose, onChanged }
 }
 const fill = async (cur: string, next: string, again: string) => {
   // fireEvent.change thay vì gõ từng phím: modal antd render nặng, gõ từng phím dễ quá 5 giây
@@ -22,11 +22,12 @@ beforeEach(() => { vi.mocked(authApi.changePassword).mockReset() })
 
 test('đổi mật khẩu thành công thì gọi API và đóng modal', async () => {
   vi.mocked(authApi.changePassword).mockResolvedValue(undefined)
-  const onClose = wrap()
+  const { onClose, onChanged } = wrap()
   await fill('password123', 'newpassword456', 'newpassword456')
   await waitFor(() => expect(authApi.changePassword).toHaveBeenCalledWith('password123', 'newpassword456'))
   await waitFor(() => expect(onClose).toHaveBeenCalled())
-  expect(await screen.findByText('Đã đổi mật khẩu')).toBeInTheDocument()
+  await waitFor(() => expect(onChanged).toHaveBeenCalled())
+  expect(await screen.findByText('Đã đổi mật khẩu, vui lòng đăng nhập lại')).toBeInTheDocument()
 })
 
 test('nhập lại không khớp hoặc quá ngắn thì không gọi API', async () => {
@@ -45,8 +46,9 @@ test('mật khẩu mới dưới 8 ký tự bị chặn', async () => {
 
 test('lỗi từ server hiện qua errorText và không đóng modal', async () => {
   vi.mocked(authApi.changePassword).mockRejectedValue({ code: 'VALIDATION_FAILED', message: 'Mật khẩu hiện tại không đúng', status: 400, details: null })
-  const onClose = wrap()
+  const { onClose, onChanged } = wrap()
   await fill('sai-sai-sai', 'newpassword456', 'newpassword456')
   expect(await screen.findByText('Mật khẩu hiện tại không đúng')).toBeInTheDocument()
   expect(onClose).not.toHaveBeenCalled()
+  expect(onChanged).not.toHaveBeenCalled()
 })

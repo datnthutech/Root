@@ -5,7 +5,7 @@ import { errorText } from '../auth/errorText'
 
 interface Values { currentPassword: string; newPassword: string; confirm: string }
 
-export default function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function ChangePasswordModal({ open, onClose, onChanged }: { open: boolean; onClose: () => void; onChanged: () => void | Promise<void> }) {
   const { message } = App.useApp()
   const [form] = Form.useForm<Values>()
   const [saving, setSaving] = useState(false)
@@ -14,9 +14,10 @@ export default function ChangePasswordModal({ open, onClose }: { open: boolean; 
     setSaving(true)
     try {
       await authApi.changePassword(v.currentPassword, v.newPassword)
-      message.success('Đã đổi mật khẩu')
+      message.success('Đã đổi mật khẩu, vui lòng đăng nhập lại')
       form.resetFields()
       onClose()
+      await onChanged()
     } catch (err) {
       message.error(errorText(err))
     } finally {

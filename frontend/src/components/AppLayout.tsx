@@ -25,7 +25,8 @@ export default function AppLayout() {
         </Space>
       </Layout.Header>
       <Layout.Content><Outlet /></Layout.Content>
-      <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
+      <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)}
+        onChanged={async () => { await logout(); navigate('/login') }} />
     </Layout>
   )
 }

@@ -11,8 +11,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
     // Các test dựng component Ant Design (Drawer/Select/Form) trong jsdom rất nặng: một thao tác
-    // userEvent có thể mất >1s, nên mặc định 5s của Vitest không đủ (đã đo: cả bộ cũ vite5/vitest2
-    // lẫn bộ mới đều chậm như nhau, đây không phải hệ quả của việc nâng phiên bản).
+    // userEvent có thể mất >1s, nên mặc định 5s của Vitest không đủ (trên vite5/vitest2 vài test đã mất
+    // 3,4–3,9s, sát ngưỡng; sau khi lên vite8/vitest5 chúng vượt 5s, nên nâng timeout lên 30s).
     testTimeout: 30_000,
     hookTimeout: 30_000,
   },
