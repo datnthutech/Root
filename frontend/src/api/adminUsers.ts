@@ -10,6 +10,6 @@ export const adminUsersApi = {
   update: (id: number, patch: AdminUserPatch) => http<AdminUser>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(patch) }),
   resetUserPassword: (id: number, newPassword: string) =>
     http<void>(`/admin/users/${id}/password`, { method: 'PUT', body: JSON.stringify({ newPassword }) }),
-  create: (b: { username: string; password: string; displayName: string; role: Role; linkedPersonId?: number }) =>
+  create: (b: { username: string; password: string; displayName?: string; role: Role; linkedPersonId?: number }) =>
     http<AdminUser>('/admin/users', { method: 'POST', body: JSON.stringify(b) }),
 }
