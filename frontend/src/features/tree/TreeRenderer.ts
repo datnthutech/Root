@@ -1,4 +1,6 @@
 import { Application, Container, Graphics, Point, Sprite, Text, Texture } from 'pixi.js'
+// để PixiJS chạy được khi CSP không cho phép 'unsafe-eval'
+import '@pixi/unsafe-eval'
 import { Viewport } from 'pixi-viewport'
 import type { GraphData, GraphPerson } from '../../lib/types'
 import type { LayoutNode, LayoutResult } from '../../lib/layout'

@@ -12,12 +12,13 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.4",
+    "@pixi/unsafe-eval": "7.4.3",
     "@tanstack/react-query": "^5.59.0",
     "antd": "^5.21.0",
     "dayjs": "^1.11.23",
     "idb-keyval": "^6.2.1",
     "pixi-viewport": "5.0.3",
-    "pixi.js": "^7.4.2",
+    "pixi.js": "7.4.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.4"
