@@ -23,11 +23,13 @@ public class AdminUserService {
     private final AppUserRepository users;
     private final PersonRepository persons;
     private final PasswordEncoder encoder;
+    private final RefreshTokenRepository tokens;
 
-    public AdminUserService(AppUserRepository users, PersonRepository persons, PasswordEncoder encoder) {
+    public AdminUserService(AppUserRepository users, PersonRepository persons, PasswordEncoder encoder, RefreshTokenRepository tokens) {
         this.users = users;
         this.persons = persons;
         this.encoder = encoder;
+        this.tokens = tokens;
     }
 
     public List<AdminUserView> list(UserStatus status) {
@@ -56,13 +58,29 @@ public class AdminUserService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Không thể tự hạ quyền hoặc tự khoá chính mình");
         }
         if (displayName != null) u.setDisplayName(displayName);
+        boolean demoted = role != null && role != u.getRole();
         if (role != null) u.setRole(role);
         if (linkedPersonId != null) { checkPerson(linkedPersonId); u.setLinkedPersonId(linkedPersonId); }
+        boolean deactivated = status != null && status != UserStatus.ACTIVE;
         if (status != null) {
             u.setStatus(status);
             if (status == UserStatus.ACTIVE) { u.setLockedUntil(null); u.setFailedAttempts(0); }
         }
-        return AdminUserView.of(users.save(u));
+        AdminUserView view = AdminUserView.of(users.save(u));
+        // đổi quyền hoặc khoá: thu hồi mọi refresh token để quyền cũ không sống thêm qua refresh
+        if (demoted || deactivated) tokens.revokeAllForUser(id);
+        return view;
+    }
+
+    /** Admin đặt lại mật khẩu: mở khoá tạm, xoá bộ đếm sai và thu hồi mọi refresh token của user. */
+    @Transactional
+    public void resetPassword(long id, String next) {
+        AppUser u = users.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Không tìm thấy tài khoản"));
+        u.setPasswordHash(encoder.encode(next));
+        u.setFailedAttempts(0);
+        u.setLockedUntil(null);
+        users.save(u);
+        tokens.revokeAllForUser(id);
     }
 
     private void checkPerson(Long personId) {

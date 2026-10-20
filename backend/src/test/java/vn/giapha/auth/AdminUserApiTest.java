@@ -21,6 +21,7 @@ class AdminUserApiTest {
     @Autowired MockMvc mvc;
     @Autowired TestUsers tu;
     @Autowired AppUserRepository users;
+    @Autowired org.springframework.security.crypto.password.PasswordEncoder encoder;
 
     @Test
     void onlyAdminCanListUsers() throws Exception {
@@ -96,5 +97,39 @@ class AdminUserApiTest {
         mvc.perform(post("/api/v1/admin/users").header("Authorization", tu.bearer(Role.ADMIN)).contentType(MediaType.APPLICATION_JSON)
             .content("{\"username\":\"u" + System.nanoTime() + "\",\"password\":\"" + "ệ".repeat(30) + "\"}"))
            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void demotedUserLosesOldRoleImmediately() throws Exception {
+        AppUser editor = tu.create(Role.EDITOR);
+        String oldToken = tu.bearerFor(editor);
+        mvc.perform(put("/api/v1/admin/users/" + editor.getId()).header("Authorization", tu.bearer(Role.ADMIN))
+            .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"VIEWER\"}")).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/persons").header("Authorization", oldToken)
+            .contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void lockedUserTokenStopsWorkingImmediately() throws Exception {
+        AppUser u = tu.create(Role.VIEWER);
+        String oldToken = tu.bearerFor(u);
+        mvc.perform(get("/api/v1/me").header("Authorization", oldToken)).andExpect(status().isOk());
+        mvc.perform(put("/api/v1/admin/users/" + u.getId()).header("Authorization", tu.bearer(Role.ADMIN))
+            .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LOCKED\"}")).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/me").header("Authorization", oldToken)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void lockingRevokesRefreshTokens() throws Exception {
+        AppUser u = tu.create(Role.VIEWER);
+        u.setPasswordHash(encoder.encode("password123"));
+        users.save(u);
+        var res = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"username\":\"" + u.getUsername() + "\",\"password\":\"password123\"}"))
+            .andExpect(status().isOk()).andReturn().getResponse();
+        var cookie = res.getCookie("refresh_token");
+        mvc.perform(put("/api/v1/admin/users/" + u.getId()).header("Authorization", tu.bearer(Role.ADMIN))
+            .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LOCKED\"}")).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/auth/refresh").cookie(cookie)).andExpect(status().isUnauthorized());
     }
 }

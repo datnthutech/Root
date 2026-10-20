@@ -41,6 +41,7 @@ class PermissionMatrixTest {
     /** `{p}`=người, `{c}`=dòng họ, `{l}`=liên kết, `{u}`=hôn phối, `{a}`=mục audit, `{x}`=tài khoản. Mọi đường dẫn dưới /api/v1. */
     static final List<Ep> MATRIX = List.of(
         ep("GET", "/me", Role.VIEWER),
+        ep("PUT", "/me/password", Role.VIEWER),
         ep("GET", "/clans", Role.VIEWER),
         ep("GET", "/clans/{c}/graph", Role.VIEWER),
         ep("GET", "/persons/{p}/focus", Role.VIEWER),
@@ -66,6 +67,7 @@ class PermissionMatrixTest {
         ep("GET", "/admin/users", Role.ADMIN),
         ep("POST", "/admin/users", Role.ADMIN),
         ep("PUT", "/admin/users/{x}", Role.ADMIN),
+        ep("PUT", "/admin/users/{x}/password", Role.ADMIN),
         ep("GET", "/admin/clans", Role.ADMIN),
         ep("POST", "/admin/clans", Role.ADMIN),
         ep("PUT", "/admin/clans/{c}", Role.ADMIN),
@@ -143,7 +145,7 @@ class PermissionMatrixTest {
     @Test
     void guardCatchesMappingWithoutExplicitMethod() throws Exception {
         var info = RequestMappingInfo.paths("/api/v1/me").build();   // như @RequestMapping("/me") không có method=
-        var hm = new org.springframework.web.method.HandlerMethod(new vn.giapha.auth.MeController(null),
+        var hm = new org.springframework.web.method.HandlerMethod(new vn.giapha.auth.MeController(null, null),
             vn.giapha.auth.MeController.class.getMethod("me", vn.giapha.auth.AuthUser.class));
         Set<String> declared = declaredEndpoints(Map.of(info, hm));
         assertThat(declared).contains("GET /me", "POST /me", "DELETE /me");

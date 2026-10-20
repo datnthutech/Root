@@ -30,6 +30,8 @@ app:
     secret: ${JWT_SECRET:change-me-change-me-change-me-change-me-32b}
     access-minutes: 15
     refresh-days: 14
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
   cookie-secure: ${COOKIE_SECURE:false}
   dev-seed:
     persons: ${DEV_SEED_PERSONS:0}

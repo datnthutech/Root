@@ -129,4 +129,26 @@ class AuthFlowTest {
            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
            .andExpect(jsonPath("$.details.password").exists());
     }
+
+    @Test
+    void lockedAccountWithWrongPasswordIs401AndDoesNotCountAttempts() throws Exception {
+        String u = name();
+        register(u, "password123");
+        activate(u);
+        AppUser x = users.findByUsername(u).orElseThrow();
+        x.setLockedUntil(java.time.Instant.now().plusSeconds(600));
+        x.setFailedAttempts(2);
+        users.save(x);
+        MvcResult wrong = login(u, "wrong-wrong-1");
+        assertThat(wrong.getResponse().getStatus()).isEqualTo(401);
+        assertThat(wrong.getResponse().getContentAsString()).contains("BAD_CREDENTIALS");
+        assertThat(users.findByUsername(u).orElseThrow().getFailedAttempts()).isEqualTo(2);
+    }
+
+    @Test
+    void unknownUsernameIs401BadCredentials() throws Exception {
+        MvcResult r = login(name(), "password123");
+        assertThat(r.getResponse().getStatus()).isEqualTo(401);
+        assertThat(r.getResponse().getContentAsString()).contains("BAD_CREDENTIALS");
+    }
 }

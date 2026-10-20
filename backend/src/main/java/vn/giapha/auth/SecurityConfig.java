@@ -1,6 +1,7 @@
 package vn.giapha.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -23,7 +24,7 @@ import vn.giapha.common.ApiError;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain chain(HttpSecurity http, JwtAuthFilter jwtFilter, ObjectMapper om) throws Exception {
+    SecurityFilterChain chain(HttpSecurity http, JwtAuthFilter jwtFilter, AuthRateLimitFilter rateLimitFilter, ObjectMapper om) throws Exception {
         http.csrf(c -> c.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
@@ -42,6 +43,7 @@ public class SecurityConfig {
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((req, res, ex) -> { res.setHeader("WWW-Authenticate", "Bearer"); write(om, res, 401, new ApiError("UNAUTHENTICATED", "Cần đăng nhập", null)); })
                 .accessDeniedHandler((req, res, ex) -> write(om, res, 403, new ApiError("FORBIDDEN", "Không đủ quyền", null))))
+            .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
@@ -51,6 +53,14 @@ public class SecurityConfig {
         res.setStatus(status);
         res.setContentType(MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8");
         om.writeValue(res.getOutputStream(), body);
+    }
+
+    // Filter là @Component nên Spring Boot tự đăng ký làm servlet filter; tắt để chỉ chạy trong chuỗi Security
+    @Bean
+    FilterRegistrationBean<AuthRateLimitFilter> rateLimitRegistration(AuthRateLimitFilter f) {
+        FilterRegistrationBean<AuthRateLimitFilter> r = new FilterRegistrationBean<>(f);
+        r.setEnabled(false);
+        return r;
     }
 
     @Bean

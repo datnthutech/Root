@@ -20,6 +20,9 @@ public class AdminUserController {
         @Size(max = 120) String displayName, Role role, Long linkedPersonId) {}
     public record UpdateRequest(@Size(max = 120) String displayName, Role role, UserStatus status, Long linkedPersonId) {}
 
+    public record ResetPasswordRequest(
+        @NotBlank @Size(min = 8) @vn.giapha.common.MaxUtf8Bytes String newPassword) {}
+
     private final AdminUserService service;
 
     public AdminUserController(AdminUserService service) { this.service = service; }
@@ -39,5 +42,11 @@ public class AdminUserController {
     public AdminUserService.AdminUserView update(@AuthenticationPrincipal AuthUser me, @PathVariable long id,
                                                  @Valid @RequestBody UpdateRequest r) {
         return service.update(me.id(), id, r.displayName(), r.role(), r.status(), r.linkedPersonId());
+    }
+
+    @PutMapping("/{id}/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(@PathVariable long id, @Valid @RequestBody ResetPasswordRequest r) {
+        service.resetPassword(id, r.newPassword());
     }
 }
