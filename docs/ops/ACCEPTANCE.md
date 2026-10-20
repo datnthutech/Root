@@ -20,7 +20,7 @@ Ngày ghi: 2026-10-15  Người thực hiện: ____  Máy chủ: CHƯA TRIỂN K
 
 ## M2 — Xem cây, đăng nhập, phân quyền
 - [x] Mọi ô ma trận phân quyền có test API — ĐÃ CHẠY trong bộ test BE (`PermissionMatrixTest`, 4 test, gồm test chặn endpoint thiếu trong ma trận/OpenAPI). Lệnh: `cd backend && ./gradlew test --tests '*PermissionMatrixTest'`. Ghi lại số test thực tế khi nghiệm thu: ____
-- [ ] Toàn bộ test BE + FE xanh trên commit phát hành — **CHƯA KIỂM LẠI** trên commit cuối (ghi nhận lần chạy gần nhất của Task 1: 234 test BE; cần chạy lại `./gradlew build` và `npm test` rồi điền kết quả: ____)
+- [x] Toàn bộ test BE + FE xanh trên cây làm việc hiện tại — **ĐÃ CHẠY**: BE `./gradlew test --rerun-tasks` → **269 test, 0 lỗi**, BUILD SUCCESSFUL (56 s); FE `npm test` → **35 tệp / 168 test, 0 lỗi** (106 s); FE `npm run build` (gồm `tsc --noEmit`) → thành công. **Cần chạy lại đúng trên commit phát hành** và điền lại số liệu: ____
 - [ ] BE graph 2.000 người < 800 ms, gzip < 120 KB — đã đo MockMvc cục bộ: 40 ms / 37 KB gz (xem trên); **CHƯA ĐO trên máy chủ thật qua Caddy** (10.000 người: 195 ms / 179 KB gz, chỉ tham khảo)
 - [ ] Mở cây < 2 giây (lần đầu) trên máy chủ thật — **CHƯA ĐO** (`BASE_URL=https://… E2E_USER=… E2E_PASS=… npm run measure`; coldTreeMs = ____). Cục bộ 1090 ms chỉ là cây thu gọn, software GL.
 - [ ] Popup < 300 ms trên máy chủ thật — **CHƯA ĐO** (popupMs = ____; cục bộ 278 ms, sát ngưỡng)
@@ -28,13 +28,13 @@ Ngày ghi: 2026-10-15  Người thực hiện: ____  Máy chủ: CHƯA TRIỂN K
 ## M3 — Chỉnh sửa, nhật ký
 - [x] Test BE cho chỉnh sửa, nhật ký, revert nằm trong bộ test BE (E6, E7) — ĐÃ CHẠY khi hoàn thành từng plan; chưa xác nhận lại trên commit phát hành (xem mục "Toàn bộ test" ở M2)
 - [ ] E6 kiểm thủ công trên trình duyệt (thêm người, gắn quan hệ, sửa, đổi ảnh; cấp thấp không thấy ngày sinh đầy đủ và không có nút sửa) — **CHƯA KIỂM**
-- [ ] Đổi/hiển thị ảnh qua MinIO thật (pin ảnh, smoke test upload + xem) — **CHƯA KIỂM** (test dùng `InMemoryPhotoStorage`; MinIO chưa ghim phiên bản)
+- [x] Đổi/hiển thị ảnh qua RustFS thật (smoke test upload + xem) — **ĐÃ CHẠY** trên stack Docker cục bộ (`./deploy.sh up`, RustFS 1.0.3): `PUT /api/v1/persons/1/photo` → 200; `GET /api/v1/persons/1/photo?size=96` → JPEG 96×96, 773 byte. Vẫn **CHƯA KIỂM trên máy chủ thật** (bộ test BE vẫn dùng `InMemoryPhotoStorage`).
 
 ## M4 — Phát hành
 | # | Điều kiện | Cách kiểm | Kết quả | Trạng thái |
 | --- | --- | --- | --- | --- |
 | 1 | Mọi ô ma trận có test API | `./gradlew test --tests '*PermissionMatrixTest'` | xem M2 | ĐÃ CHẠY (số test cuối: ____) |
-| 2 | Toàn bộ test BE + FE xanh | `./gradlew build` ; `npm test` | ____ | CHƯA KIỂM lại |
+| 2 | Toàn bộ test BE + FE xanh | `./gradlew build` ; `npm test` | BE 269 test / 0 lỗi; FE 168 test / 0 lỗi | ĐÃ CHẠY trên cây làm việc; cần chạy lại trên commit phát hành |
 | 3 | Nhập đủ 2.000 người từ Excel | `/admin/import` với tệp 2.000 người: kiểm tra thử sạch lỗi; nhập thật | ~2,4 ms/người cục bộ; ____ người, ____ quan hệ, ____ s | CHƯA ĐO qua UI/máy chủ thật |
 | 4 | Mở cây < 2 giây (lần đầu) | `npm run measure` với `BASE_URL` thật | coldTreeMs = ____ | CHƯA ĐO |
 | 5 | Popup < 300 ms | cùng lệnh | popupMs = ____ (cục bộ 278 ms) | CHƯA ĐO |
@@ -56,7 +56,7 @@ Ngày ghi: 2026-10-15  Người thực hiện: ____  Máy chủ: CHƯA TRIỂN K
 
 ## Việc cần làm trước khi go-live
 1. Triển khai theo `docs/ops/DEPLOY.md` trên máy chủ thật với tên miền thật; xác nhận HTTPS/Let's Encrypt và chuyển hướng 80 → 443, cookie `Secure`/`HttpOnly`.
-2. Ghim phiên bản `minio/minio` (tag RELEASE), thêm healthcheck, chạy smoke test đổi/xem ảnh.
+2. Thêm healthcheck, chạy smoke test đổi/xem ảnh.
 3. Đo M1 (fps ≥ 55 với 10.000 nút, hover 10/10) bằng Chrome + GPU thật theo `docs/reports/M1-render-prototype.md`; nếu không đạt, báo chủ dự án (phương án AntV G6), không chỉnh ngưỡng.
 4. Nhập tệp 2.000 người thật qua `/admin/import` và ghi số liệu; chạy `npm run measure` với `BASE_URL`, `E2E_USER`, `E2E_PASS` của máy chủ để lấy coldTreeMs và popupMs (popup cục bộ 278 ms đã sát 300 ms).
 5. Chạy `./gradlew build` và `npm test` trên commit phát hành; điền số test.

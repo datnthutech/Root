@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Triển khai toàn bộ app (Postgres + MinIO + Backend + Frontend) bằng Docker ở máy local.
+# Triển khai toàn bộ app (Postgres + kho ảnh RustFS + Backend + Frontend) bằng Docker ở máy local.
 # Cách dùng:  ./deploy.sh [lệnh]      (mặc định: up)
 set -euo pipefail
 
@@ -7,12 +7,22 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 COMPOSE=(docker compose -f docker-compose.yml)
 
 # Biến có thể ghi đè khi chạy, ví dụ:  SEED=2000 WEB_PORT=9000 ./deploy.sh up
+# Đều export lại chính biến nguồn để lệnh "reset" (chạy lại script) không mất lựa chọn của người dùng.
 export WEB_PORT="${WEB_PORT:-7070}"
 export API_PORT="${API_PORT:-7080}"
 export MINIO_PORT="${MINIO_PORT:-7001}"
-export DEV_SEED_PERSONS="${SEED:-300}"          # số người mẫu (0 = DB trống); chỉ sinh khi chưa có dòng họ nào
-export BOOTSTRAP_ADMIN_USER="${ADMIN_USER:-admin}"
-export BOOTSTRAP_ADMIN_PASSWORD="${ADMIN_PASSWORD:-password123}"
+export SEED="${SEED:-300}"                      # số người mẫu (0 = DB trống); chỉ sinh khi chưa có dòng họ nào
+export ADMIN_USER="${ADMIN_USER:-admin}"
+export ADMIN_PASSWORD="${ADMIN_PASSWORD:-password123}"
+# Chặn tần suất đăng nhập mặc định TẮT ở local: trong Docker mọi request đều đến từ cùng một IP gateway
+# nên 10 lần đăng nhập/phút là của chung cả máy, rất dễ tự khoá khi thử nghiệm. Bật lại bằng RATE_LIMIT=1.
+export RATE_LIMIT="${RATE_LIMIT:-0}"
+export NO_MINIO="${NO_MINIO:-}"
+
+export DEV_SEED_PERSONS="$SEED"
+export BOOTSTRAP_ADMIN_USER="$ADMIN_USER"
+export BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PASSWORD"
+export RATE_LIMIT_ENABLED="$([ "$RATE_LIMIT" = "0" ] && echo false || echo true)"
 URL="http://localhost:${WEB_PORT}"
 
 usage() {
@@ -27,7 +37,8 @@ Lệnh:
   help      Hiện trợ giúp
 
 Biến môi trường (tuỳ chọn): SEED (mặc định 300), WEB_PORT (7070), API_PORT (7080), MINIO_PORT (7001), ADMIN_USER (admin), ADMIN_PASSWORD (password123),
-  NO_MINIO=1 (bỏ MinIO nếu không pull được image; upload ảnh sẽ không dùng được)
+  RATE_LIMIT=1 (bật chặn tần suất đăng nhập; mặc định tắt ở local vì mọi request trong Docker chung một IP),
+  NO_MINIO=1 (bỏ kho ảnh nếu không pull được image; upload ảnh sẽ không dùng được)
 USAGE
 }
 
@@ -48,7 +59,9 @@ wait_ready() {
       echo "Sẵn sàng:  ${URL}"
       echo "Đăng nhập: ${BOOTSTRAP_ADMIN_USER} / ${BOOTSTRAP_ADMIN_PASSWORD}"
       echo "Swagger:   http://localhost:${API_PORT}/swagger-ui/index.html"
-      [ -z "${NO_MINIO:-}" ] && echo "Kho ảnh:  http://localhost:${MINIO_PORT} (minioadmin / minioadmin)"
+      # RustFS phục vụ console ở đường dẫn /rustfs/console/ (gốc "/" trả 403 AccessDenied)
+      [ -z "${NO_MINIO:-}" ] && echo "Kho ảnh:   http://localhost:${MINIO_PORT}/rustfs/console/ (minioadmin / minioadmin)"
+      [ "$RATE_LIMIT" = "0" ] && echo "Lưu ý:     đã TẮT chặn tần suất đăng nhập cho local (bật lại: RATE_LIMIT=1 ./deploy.sh restart)"
       return 0
     fi
     sleep 2
