@@ -59,7 +59,7 @@ export default function RelationDrawer({ open, mode, person, spouses, onClose, o
   const defaultGender = mode === 'spouse' ? (person.gender === 'M' ? 'F' : person.gender === 'F' ? 'M' : 'U') : 'U'
 
   return (
-    <Drawer open={open} onClose={onClose} title={`${TITLE[mode]} — ${person.name}`} width="min(520px, 100vw)" destroyOnClose>
+    <Drawer open={open} onClose={onClose} title={`${TITLE[mode]} — ${person.name}`} width="min(520px, 100vw)" destroyOnHidden>
       {mode !== 'spouse' && (
         <Space direction="vertical" style={{ width: '100%', marginBottom: 12 }}>
           <Radio.Group value={kind} onChange={(e) => setKind(e.target.value)}

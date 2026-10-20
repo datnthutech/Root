@@ -1,4 +1,4 @@
-FROM node:20 AS web
+FROM node:22 AS web
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci

@@ -18,7 +18,7 @@ export default function PersonFormDrawer(props: Props) {
     if (open) setOpenCount((c) => c + 1)
   }
   return (
-    <Drawer open={open} onClose={onClose} width="min(520px, 100vw)" destroyOnClose title={mode === 'create' ? 'Thêm người mới' : 'Sửa hồ sơ'}>
+    <Drawer open={open} onClose={onClose} width="min(520px, 100vw)" destroyOnHidden title={mode === 'create' ? 'Thêm người mới' : 'Sửa hồ sơ'}>
       <DrawerContent key={`${person?.id ?? 'new'}-${openCount}`} {...props} />
     </Drawer>
   )

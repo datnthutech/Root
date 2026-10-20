@@ -48,7 +48,7 @@ export default function PersonDialog({ personId, onClose, onNavigate, onTreeChan
 
   return (
     <>
-      <Modal open={enabled} onCancel={close} footer={null} destroyOnClose width="min(720px, calc(100vw - 16px))" style={{ top: 8 }}
+      <Modal open={enabled} onCancel={close} footer={null} destroyOnHidden width="min(720px, calc(100vw - 16px))" style={{ top: 8 }}
         title="Thông tin">
         <div data-person-ready={profile.data ? '1' : '0'}>
         <Tabs items={[

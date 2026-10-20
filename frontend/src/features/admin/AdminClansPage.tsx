@@ -37,7 +37,7 @@ export default function AdminClansPage() {
           { title: 'Cách đếm thứ', dataIndex: 'siblingCountMode', render: (m) => (m === 'PER_FATHER' ? 'Đếm liền theo cha' : 'Theo từng hôn phối') },
           { title: '', render: (_, c) => <Button size="small" onClick={() => open(c)}>Sửa</Button> },
         ]} />
-      <Modal open={editing !== null} title={editing === 'new' ? 'Thêm dòng họ' : 'Sửa dòng họ'} onCancel={() => setEditing(null)} footer={null} destroyOnClose>
+      <Modal open={editing !== null} title={editing === 'new' ? 'Thêm dòng họ' : 'Sửa dòng họ'} onCancel={() => setEditing(null)} footer={null} destroyOnHidden>
         <Form form={form} layout="vertical" onFinish={(v) => save.mutate({ ...v, founderPersonId: founder })}>
           <Form.Item label="Tên dòng họ" name="name" rules={[{ required: true, whitespace: true, message: 'Nhập tên dòng họ' }]}><Input /></Form.Item>
           <Form.Item label="Thủy tổ">
