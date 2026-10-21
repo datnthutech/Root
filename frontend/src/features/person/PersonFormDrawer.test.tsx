@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App as AntApp } from 'antd'
@@ -28,8 +28,9 @@ async function pickPrecision(index: number, label: string) {
   await userEvent.click(within(dd).getByText(label))
 }
 async function typeDate(index: number, text: string) {
-  await userEvent.type(pickers()[index], text)
-  await userEvent.tab() // Enter sẽ submit form, nên commit bằng blur
+  // fireEvent.change thay vì gõ từng phím: mỗi phím làm form render lại và validate lại, quá chậm trong jsdom
+  fireEvent.change(pickers()[index], { target: { value: text } })
+  fireEvent.blur(pickers()[index]) // Enter sẽ submit form, nên commit bằng blur
 }
 const pickers = () => Array.from(document.querySelectorAll<HTMLInputElement>('.ant-picker input'))
 
@@ -88,7 +89,7 @@ test('tải lại sau xung đột cập nhật version mới', async () => {
   expect(screen.queryByText('Dữ liệu đã được người khác sửa')).not.toBeInTheDocument()
   expect(personApi.biography).toHaveBeenCalledTimes(2)
   vi.mocked(editApi.updatePerson).mockResolvedValue(profile({ version: 8 }))
-  await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Lưu' }))
   await waitFor(() => expect(editApi.updatePerson).toHaveBeenLastCalledWith(5, expect.objectContaining({ version: 7 })))
 })
 
@@ -175,9 +176,8 @@ test('lỗi validate ngày mất được xoá khi đổi ngày sinh', async () 
   setup()
   await fillDates('15/06/1950', 'Ngày', '01/01/1940')
   expect(await screen.findByText('Ngày mất không được trước ngày sinh')).toBeInTheDocument()
-  await userEvent.clear(pickers()[0])
-  await userEvent.type(pickers()[0], '01/01/1930')
-  await userEvent.tab()
+  fireEvent.change(pickers()[0], { target: { value: '01/01/1930' } })
+  fireEvent.blur(pickers()[0])
   await waitFor(() => expect(screen.queryByText('Ngày mất không được trước ngày sinh')).not.toBeInTheDocument())
 }, 30000)
 

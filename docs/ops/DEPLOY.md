@@ -159,7 +159,8 @@ Ba vai trò: `VIEWER` (cấp thấp), `EDITOR` (cấp trung), `ADMIN` (cấp cao
 - Chặn tần suất đăng nhập đếm **theo IP trong bộ nhớ của backend**: mất khi khởi động lại và không chia sẻ giữa nhiều bản backend (hiện chỉ chạy 1 bản nên chấp nhận được).
 - IP dùng để đếm lấy từ `X-Forwarded-For` do Caddy **ghi đè** (`header_up X-Forwarded-For {remote_host}`). Giả định: **Caddy là proxy duy nhất đứng trước backend**. Nếu sau này đặt CDN/cân bằng tải phía trước Caddy thì mọi người dùng sẽ mang cùng một IP (của CDN) và chung hạn mức — khi đó phải đổi sang lấy IP theo số chặng proxy tin cậy.
 - Kho ảnh: image `rustfs/rustfs:1.0.3` (đã ghim; thay cho `minio/minio` đã bị gỡ khỏi Docker Hub), chưa có healthcheck; chưa chạy thử ảnh trên máy chủ thật.
-- Các image `node:22`, `caddy:2`, `postgres:16` dùng tag trôi; Caddy chạy root; `backend` chưa có healthcheck. (CSP và `Permissions-Policy` đã có trong `ops/caddy/Caddyfile`; CSP còn `'unsafe-inline'` cho style của Ant Design.)
+- Các image (`node`, `caddy`, `postgres`, `eclipse-temurin`) đã ghim tag cụ thể; nâng phiên bản là việc chủ động: sửa tag, build và test lại.
+- CSP và `Permissions-Policy` đã có trong `ops/caddy/Caddyfile`; CSP còn `'unsafe-inline'` cho style của Ant Design.
 - Sao lưu mặc định nằm cùng máy chủ; chưa có sao lưu ngoài máy (mục 7).
 - Cây 2.000 người khi mở lần đầu chỉ bố cục phần đang mở (đo cục bộ: 18/2000 nút), nên "thời gian mở cây" đo ở trạng thái thu gọn.
 - Hiệu năng vẽ cây 10.000 nút (M1: ≥ 55 fps, hover) chưa được đo trên phần cứng thật (xem `docs/reports/M1-render-prototype.md`).

@@ -1,4 +1,4 @@
-FROM postgres:16
+FROM postgres:16.15
 RUN apt-get update && apt-get install -y --no-install-recommends cron tar && rm -rf /var/lib/apt/lists/*
 COPY backup.sh restore.sh verify-restore.sh /usr/local/bin/
 COPY crontab /etc/cron.d/giapha-backup

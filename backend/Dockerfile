@@ -6,7 +6,7 @@ RUN gradle --no-daemon -q dependencies > /dev/null || true
 COPY backend/src ./src
 RUN gradle --no-daemon -q bootJar -x test
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:21.0.12.1_1-jre
 RUN useradd -r -u 1001 app
 WORKDIR /app
 COPY --from=build /app/build/libs/giapha-0.0.1-SNAPSHOT.jar /app/app.jar

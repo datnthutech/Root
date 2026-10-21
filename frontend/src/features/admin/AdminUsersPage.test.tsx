@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App as AntApp } from 'antd'
@@ -32,6 +32,8 @@ test('tạo tài khoản mới gọi API với giá trị đã nhập', async ()
   await userEvent.click(screen.getByRole('button', { name: 'Tạo tài khoản' }))
   await waitFor(() => expect(adminUsersApi.create).toHaveBeenCalledWith(expect.objectContaining({ username: 'nguyenvana', password: 'password123', displayName: 'Nguyễn Văn A', role: 'VIEWER', linkedPersonId: undefined })))
   expect(await screen.findByText('Đã tạo tài khoản')).toBeInTheDocument()
+  await waitFor(() => expect(adminUsersApi.list).toHaveBeenLastCalledWith(undefined))
+  expect(screen.getByText('Tất cả')).toBeInTheDocument()
 })
 
 test('nhập lại mật khẩu không khớp thì không gọi API', async () => {
@@ -68,5 +70,7 @@ test('lỗi validation từ server hiện ngay dưới ô tương ứng', async 
   await openCreate()
   fill('nguyenvana', 'password123', 'password123')
   await userEvent.click(screen.getByRole('button', { name: 'Tạo tài khoản' }))
-  expect(await screen.findByText('size must be between 3 and 50')).toBeInTheDocument()
+  await screen.findByText('size must be between 3 and 50')
+  const field = screen.getByLabelText('Tên đăng nhập').closest<HTMLElement>('.ant-form-item')!
+  expect(within(field).getByText('size must be between 3 and 50')).toBeInTheDocument()
 })

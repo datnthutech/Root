@@ -3,7 +3,7 @@
 name: giapha-local
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16.15
     restart: unless-stopped
     environment:
       POSTGRES_DB: giapha
@@ -49,12 +49,19 @@ services:
       BOOTSTRAP_ADMIN_USER: ${BOOTSTRAP_ADMIN_USER:-admin}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-password123}
     ports: ["127.0.0.1:${API_PORT:-7080}:8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
   web:
     build:
       context: .
       dockerfile: ops/caddy/Dockerfile
     restart: unless-stopped
-    depends_on: [backend]
+    depends_on:
+      backend: { condition: service_healthy }
     environment:
       # ":80" = HTTP thuần, không tự bật HTTPS/redirect (chỉ dùng local)
       DOMAIN: ":80"
