@@ -64,7 +64,10 @@ class AuthFlowTest {
            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("USERNAME_TAKEN"));
         mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
             .content("{\"username\":\"ab\",\"password\":\"short\"}"))
-           .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+           .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+           // thông báo tiếng Việt từ ValidationMessages.properties, frontend hiển thị nguyên văn
+           .andExpect(jsonPath("$.details.username").value("Phải từ 3 đến 50 ký tự"))
+           .andExpect(jsonPath("$.details.password").value("Tối thiểu 8 ký tự"));
     }
 
     @Test

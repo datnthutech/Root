@@ -65,12 +65,12 @@ test('trùng tên đăng nhập thì báo lỗi và modal vẫn mở', async () 
 })
 
 test('lỗi validation từ server hiện ngay dưới ô tương ứng', async () => {
-  vi.mocked(adminUsersApi.create).mockRejectedValue({ code: 'VALIDATION_FAILED', message: 'Dữ liệu không hợp lệ', status: 400, details: { username: 'size must be between 3 and 50' } })
+  vi.mocked(adminUsersApi.create).mockRejectedValue({ code: 'VALIDATION_FAILED', message: 'Dữ liệu không hợp lệ', status: 400, details: { username: 'Phải từ 3 đến 50 ký tự' } })
   wrap()
   await openCreate()
   fill('nguyenvana', 'password123', 'password123')
   await userEvent.click(screen.getByRole('button', { name: 'Tạo tài khoản' }))
-  await screen.findByText('size must be between 3 and 50')
+  await screen.findByText('Phải từ 3 đến 50 ký tự')
   const field = screen.getByLabelText('Tên đăng nhập').closest<HTMLElement>('.ant-form-item')!
-  expect(within(field).getByText('size must be between 3 and 50')).toBeInTheDocument()
+  expect(within(field).getByText('Phải từ 3 đến 50 ký tự')).toBeInTheDocument()
 })
