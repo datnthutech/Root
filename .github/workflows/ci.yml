@@ -1,5 +1,13 @@
 name: ci
-on: [push, pull_request]
+# push chỉ chạy trên main; nhánh khác chạy qua pull_request, tránh mỗi lần push vào nhánh có PR bị chạy 2 lần.
+on:
+  push:
+    branches: [main]
+  pull_request:
+# Lượt chạy mới của cùng nhánh/PR huỷ lượt cũ đang chạy dở.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -11,6 +19,36 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew --no-daemon build
         working-directory: backend
+      # Khi fail: in nguyên nhân gốc (dòng lỗi đầu + các "Caused by:") của tối đa 5 lỗi khác nhau thành
+      # annotation, xem được ngay trên trang tóm tắt và qua API công khai mà không cần tải log.
+      - name: Tóm tắt nguyên nhân lỗi test
+        if: failure()
+        working-directory: backend
+        run: |
+          python3 - <<'EOF'
+          import glob, xml.etree.ElementTree as ET
+          def esc(s): return s.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+          files = glob.glob('build/test-results/test/*.xml')
+          if not files:
+              print('::error title=Không có kết quả test::Build lỗi trước khi chạy test (xem log bước build)')
+              raise SystemExit
+          seen, shown = set(), 0
+          for f in sorted(files):
+              for tc in ET.parse(f).getroot().iter('testcase'):
+                  for bad in list(tc.findall('failure')) + list(tc.findall('error')):
+                      lines = [l.strip() for l in (bad.text or '').splitlines()]
+                      if 'failure threshold' in (lines[0] if lines else ''):
+                          continue  # lỗi hệ quả: context đã hỏng ở lần nạp đầu
+                      causes = [lines[0]] + [l for l in lines if l.startswith('Caused by:')]
+                      key = causes[-1]
+                      if key in seen or shown >= 5:
+                          continue
+                      seen.add(key); shown += 1
+                      title = f"{tc.get('classname', '').split('.')[-1]}.{tc.get('name', '')}"
+                      print(f"::error title={esc(title)}::{esc(chr(10).join(c[:400] for c in causes))}")
+          if shown == 0:
+              print('::error title=Không tìm thấy nguyên nhân gốc::Không có test lỗi kèm nguyên nhân gốc (chỉ có lỗi hệ quả hoặc build lỗi ngoài test); xem log bước build')
+          EOF
   frontend:
     runs-on: ubuntu-latest
     # Bộ test FE dựng nhiều component Ant Design trong jsdom nên chạy khá lâu (~2 phút trên máy
