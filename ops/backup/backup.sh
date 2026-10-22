@@ -41,3 +41,9 @@ find "$BACKUP_DIR" -type f -name '*.tmp' -mtime +0 -delete
 date -u +%FT%TZ > "$BACKUP_DIR/.last_success.tmp"
 mv "$BACKUP_DIR/.last_success.tmp" "$BACKUP_DIR/.last_success"
 echo "[$(date -u +%FT%TZ)] backup ok: giapha-$ts.dump"
+
+# bản local đã an toàn; offsite lỗi thì báo và thoát khác 0, nhưng .last_success vẫn được giữ
+if ! /usr/local/bin/offsite.sh "$ts"; then
+  echo "[$(date -u +%FT%TZ)] LỖI: offsite thất bại (bản local giapha-$ts.dump vẫn hợp lệ)" >&2
+  exit 1
+fi

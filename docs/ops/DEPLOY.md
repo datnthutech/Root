@@ -91,20 +91,66 @@ Lưu ý về `restore.sh`: (1) tên DB đích mặc định chỉ được dạn
 Ảnh (RustFS, volume `miniodata`): giải nén `photos-<ts>.tar.gz` vào volume này khi cần khôi phục ảnh.
 
 ## 7. Sao lưu, khôi phục, kiểm tra
-- Dịch vụ `backup` chạy cron **02:30 UTC** hằng ngày (`ops/backup/crontab`): `pg_dump -Fc` ra `/backups/giapha-<ts>.dump` (có kiểm `pg_restore -l`) và nén ảnh MinIO ra `/backups/photos-<ts>.tar.gz`. Giữ `RETENTION_DAYS=14` ngày.
+- Dịch vụ `backup` chạy cron **02:30 UTC** hằng ngày (`ops/backup/crontab`): `pg_dump -Fc` ra `/backups/giapha-<ts>.dump` (có kiểm `pg_restore -l`) và nén ảnh MinIO ra `/backups/photos-<ts>.tar.gz`. Giữ `RETENTION_DAYS=14` ngày ở local. Sau bản local thành công, cùng lần chạy đó mã hoá rồi đẩy bản sao lên Google Drive (mục 7.1). Bản local **không** mã hoá, để `restore.sh` và `verify-restore.sh` dùng trực tiếp; chỉ bản đẩy ra ngoài được mã hoá.
 - Chạy tay một lần: `dc exec backup backup.sh`. Bỏ qua ảnh (cố ý): `SKIP_PHOTOS=1`.
-- Dấu thành công: tệp `/backups/.last_success` chỉ được ghi khi một lần sao lưu hoàn toàn thành công. Healthcheck của `backup` báo `unhealthy` nếu dấu này cũ hơn 26 giờ hoặc chưa có (có `start_period` 26 giờ để chờ lần cron đầu tiên). Kiểm: `dc ps` (cột health) hoặc `dc exec backup cat /backups/.last_success`.
+- Dấu thành công: tệp `/backups/.last_success` chỉ được ghi khi bản sao lưu local hoàn toàn thành công. Nếu đã bật offsite, tệp `/backups/.last_offsite_success` chỉ được ghi khi bản đẩy ra ngoài cũng thành công. Healthcheck của `backup` báo `unhealthy` nếu một trong các dấu đang bật cũ hơn 26 giờ hoặc chưa có (có `start_period` 26 giờ để chờ lần cron đầu tiên). Kiểm: `dc ps` (cột health) hoặc `dc exec backup cat /backups/.last_success /backups/.last_offsite_success`.
 - **Thử khôi phục (bắt buộc, nên chạy định kỳ):**
   ```bash
   dc exec backup verify-restore.sh      # kết quả mong đợi: dòng cuối "VERIFY OK (...)"
   ```
-  Script khôi phục bản mới nhất vào DB tạm `giapha_verify_<pid>`, so số dòng các bảng `person, union_rel, parent_child, clan, clan_member, app_user, audit_log` với DB hiện tại (dung sai hai chiều: lớn hơn của 5 dòng và 5 %), so `flyway_schema_history` tuyệt đối, và thất bại nếu bản mới nhất cũ hơn 26 giờ. Xong tự xoá DB tạm.
-- **Chép `backups` ra nơi khác** — sao lưu cùng máy không chống được hỏng ổ đĩa. Ví dụ hằng ngày (cron của máy chủ, sau 02:30 UTC):
+  Script khôi phục bản local mới nhất (chưa mã hoá) vào DB tạm `giapha_verify_<pid>`, so số dòng các bảng `person, union_rel, parent_child, clan, clan_member, app_user, audit_log` với DB hiện tại (dung sai hai chiều: lớn hơn của 5 dòng và 5 %), so `flyway_schema_history` tuyệt đối, và thất bại nếu bản mới nhất cũ hơn 26 giờ. Xong tự xoá DB tạm.
+
+### 7.1. Sao lưu ra Google Drive (mã hoá age + rclone)
+
+Luồng: `backup.sh` → bản local → `offsite.sh <ts>` mã hoá bằng `age` (chỉ dùng **khoá công khai** có trên máy chủ) → `rclone copyto` lên `OFFSITE_REMOTE` → xoá bản trên remote cũ hơn `OFFSITE_RETENTION_DAYS` (mặc định 30) ngày, chỉ những tệp đúng mẫu `giapha-*.dump.age` và `photos-*.tar.gz.age`. Máy chủ **không bao giờ** giữ khoá bí mật. Nếu bước offsite lỗi, `backup` thoát khác 0 kèm dòng "offsite thất bại", còn bản local vẫn hợp lệ.
+
+Các biến trong `.env.prod` (xem `.env.prod.example`):
+- `OFFSITE_REMOTE`: ví dụ `gdrive:giapha-backups`. Để trống thì tắt offsite.
+- `BACKUP_AGE_RECIPIENTS`: khoá công khai `age1...`, nhiều khoá cách nhau bằng dấu cách. Khi `OFFSITE_REMOTE` có giá trị mà thiếu hoặc sai khoá, offsite sẽ thoát lỗi và không đẩy gì.
+- `OFFSITE_RETENTION_DAYS`: mặc định `30`.
+
+**Bước 1: tạo khoá trên máy cá nhân (KHÔNG làm trên máy chủ)**
+```bash
+age-keygen -o giapha-backup.key
+```
+- Dòng `# public key: age1...` trong tệp là khoá công khai. Dán vào `BACKUP_AGE_RECIPIENTS` trong `.env.prod` trên máy chủ.
+- **Cất `giapha-backup.key` ở ít nhất 2 nơi** (ví dụ trình quản lý mật khẩu và USB rời), để riêng khỏi máy chủ.
+- **CẢNH BÁO: mất khoá bí mật này là mất toàn bộ bản sao trên Drive.** Không có cách nào giải mã lại.
+- Nên tạo thêm một khoá thứ hai làm dự phòng, rồi đặt cả hai khoá công khai vào `BACKUP_AGE_RECIPIENTS` (cách nhau bằng dấu cách). Khi đó bất kỳ khoá bí mật nào cũng giải mã được.
+
+**Bước 2: tạo remote Google Drive (trên máy cá nhân, cần trình duyệt)**
+```bash
+rclone config
+```
+- Đặt tên remote `gdrive`, type `drive`, scope **`drive.file`** (rclone chỉ thấy tệp do chính nó tạo, không đọc được phần còn lại của Drive).
+- Khuyến nghị tạo OAuth client ID riêng trên Google Cloud Console để tránh giới hạn tần suất của client mặc định dùng chung.
+- Sau khi xong, chép cấu hình lên máy chủ vào `secrets/rclone/rclone.conf` (cạnh file compose). Nếu `~/.config/rclone/rclone.conf` trên máy cá nhân có remote khác, chỉ chép phần `[gdrive]`, đừng đưa token của các remote khác lên máy chủ. Trên máy chủ:
   ```bash
-  # đường dẫn volume: docker volume inspect giapha-prod_backups
-  0 4 * * * rsync -a /var/lib/docker/volumes/giapha-prod_backups/_data/ backup-user@host-khac:/duong-dan/giapha-backups/
+  mkdir -p secrets/rclone && chmod 700 secrets/rclone
+  # chép tệp vào secrets/rclone/rclone.conf (scp hoặc dán bằng trình soạn thảo), rồi:
+  chmod 600 secrets/rclone/rclone.conf
+  dc up -d backup      # nạp lại biến OFFSITE_* / BACKUP_AGE_RECIPIENTS
   ```
-  (hoặc `rclone sync` lên kho đám mây). Việc này CHƯA được thiết lập sẵn trong repo.
+- Bản mã hoá được tạo tạm trong `/backups/.offsite-tmp` trước khi đẩy, nên ổ đĩa cần còn trống ít nhất bằng dung lượng tệp ảnh `photos-<ts>.tar.gz` lớn nhất.
+- `secrets/` đã nằm trong `.gitignore`. Không commit tệp này.
+
+**Bước 3: kiểm tra**
+```bash
+dc exec backup backup.sh                         # chạy một lần sao lưu đầy đủ, kèm offsite
+rclone ls gdrive:giapha-backups                  # trên máy cá nhân: phải thấy giapha-<ts>.dump.age
+dc exec backup cat /backups/.last_offsite_success
+```
+
+**Bước 4: khôi phục từ Drive (trên máy cá nhân)**
+```bash
+rclone copy gdrive:giapha-backups/giapha-<ts>.dump.age .
+age -d -i giapha-backup.key -o giapha-<ts>.dump giapha-<ts>.dump.age
+```
+- Chép `giapha-<ts>.dump` vào volume `backups` của máy chủ rồi dùng `restore.sh` như mục "Quay lui" ở trên. Ảnh làm tương tự: `photos-<ts>.tar.gz.age` giải mã ra `photos-<ts>.tar.gz`, rồi giải nén vào volume MinIO.
+
+**Bước 5: ghi chú giới hạn**
+- Token rclone trên máy chủ có quyền xoá các tệp do nó tạo trên Drive. Kẻ chiếm được máy chủ không đọc được nội dung bản sao (không có khoá bí mật), nhưng có thể xoá chúng.
+- Muốn chống việc xoá này cần thêm một bản sao thủ công định kỳ ra nơi khác mà máy chủ không có quyền ghi/xoá. Phần này chưa làm trong repo.
 
 ## 8. Sự cố thường gặp
 - **Caddy không lấy được chứng chỉ**: kiểm DNS `A` của `DOMAIN`, cổng 80/443 mở trên tường lửa/nhà cung cấp, `dc logs caddy`. Đừng thử liên tục (Let's Encrypt giới hạn tần suất).

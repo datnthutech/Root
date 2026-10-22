@@ -72,13 +72,21 @@ services:
       PGDATABASE: giapha
       PGPASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       RETENTION_DAYS: "14"
+      # Sao lưu offsite (mã hoá age + rclone). OFFSITE_REMOTE rỗng thì tắt; xem docs/ops/DEPLOY.md mục 7
+      OFFSITE_REMOTE: ${OFFSITE_REMOTE:-}
+      BACKUP_AGE_RECIPIENTS: ${BACKUP_AGE_RECIPIENTS:-}
+      OFFSITE_RETENTION_DAYS: ${OFFSITE_RETENTION_DAYS:-30}
+      RCLONE_CONFIG: /config/rclone/rclone.conf
     volumes:
       - backups:/backups
       - miniodata:/minio-data:ro
+      # thư mục (không phải tệp lẻ) có quyền ghi: rclone ghi lại token OAuth bằng cách đổi tên tệp
+      - ./secrets/rclone:/config/rclone
     healthcheck:
       # unhealthy nếu lần sao lưu thành công gần nhất (dấu .last_success) cũ hơn 26 giờ hoặc chưa có;
+      # nếu có OFFSITE_REMOTE thì dấu .last_offsite_success cũng phải mới tương tự;
       # start_period chừa thời gian cho lần chạy cron đầu tiên (02:30 UTC) sau khi triển khai
-      test: ["CMD-SHELL", "test -n \"$$(find /backups/.last_success -mmin -1560 2>/dev/null)\""]
+      test: ["CMD-SHELL", "test -n \"$$(find /backups/.last_success -mmin -1560 2>/dev/null)\" && { [ -z \"$$OFFSITE_REMOTE\" ] || test -n \"$$(find /backups/.last_offsite_success -mmin -1560 2>/dev/null)\"; }"]
       interval: 30m
       timeout: 10s
       retries: 1
