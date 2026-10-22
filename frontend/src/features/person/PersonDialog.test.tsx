@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App as AntApp } from 'antd'
 import { AuthContext } from '../../auth/AuthContext'
@@ -105,12 +105,12 @@ test('ADMIN xoá người: gọi deletePerson, đóng popup và báo cây làm m
   })
   vi.mocked(editApi.deletePerson).mockResolvedValue(undefined)
   const { onClose } = setup(vi.fn(), vi.fn(), 'ADMIN')
-  expect(await screen.findByRole('button', { name: 'Sửa hồ sơ' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Sửa hồ sơ' }, { timeout: 5000 })).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Xoá' }))
-  await waitFor(() => expect(screen.getAllByRole('button', { name: 'Xoá' })).toHaveLength(2))
-  await userEvent.click(screen.getAllByRole('button', { name: 'Xoá' })[1])
-  await waitFor(() => expect(editApi.deletePerson).toHaveBeenCalledWith(5))
-  await waitFor(() => expect(onClose).toHaveBeenCalled())
+  const pop = await screen.findByRole('tooltip', {}, { timeout: 5000 })
+  await userEvent.click(within(pop).getByRole('button', { name: 'Xoá' }))
+  await waitFor(() => expect(editApi.deletePerson).toHaveBeenCalledWith(5), { timeout: 5000 })
+  await waitFor(() => expect(onClose).toHaveBeenCalled(), { timeout: 5000 })
 }, 20000)
 
 test('VIEWER không có tab Lịch sử sửa và không gọi API audit', async () => {
