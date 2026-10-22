@@ -1,0 +1,34 @@
+export type ApiErrorBody = { code: string; message: string; details: unknown }
+export type ApiFailure = ApiErrorBody & { status: number }
+
+let accessToken: string | null = null
+let unauthorizedHandler: (() => Promise<boolean>) | null = null
+export const setAccessToken = (t: string | null) => { accessToken = t }
+export const getAccessToken = () => accessToken
+export const setUnauthorizedHandler = (h: (() => Promise<boolean>) | null) => { unauthorizedHandler = h }
+
+export async function rawFetch(path: string, init: RequestInit = {}, retried = false): Promise<Response> {
+  const headers = new Headers(init.headers)
+  if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
+  const res = await fetch(`/api/v1${path}`, { ...init, headers, credentials: 'include' })
+  if (res.status === 401 && !retried && unauthorizedHandler && !path.startsWith('/auth/')) {
+    if (await unauthorizedHandler()) return rawFetch(path, init, true)
+  }
+  return res
+}
+
+export async function toFailure(res: Response): Promise<ApiFailure> {
+  let body: ApiErrorBody = { code: 'UNKNOWN', message: res.statusText, details: null }
+  try { body = await res.json() } catch { /* giữ mặc định */ }
+  return { ...body, status: res.status }
+}
+
+export async function http<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await rawFetch(path, init)
+  if (!res.ok) throw await toFailure(res)
+  if (res.status === 204) return undefined as T
+  return (await res.json()) as T
+}

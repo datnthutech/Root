@@ -1,0 +1,23 @@
+{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+	handle /api/* {
+		reverse_proxy backend:8080 {
+			# Ghi ĐÈ (không nối thêm) X-Forwarded-For: Spring lấy phần tử đầu tiên của header này làm IP
+			# gọi đến, nên nếu để client tự gửi thì có thể giả mạo IP để vượt giới hạn tần suất đăng nhập.
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

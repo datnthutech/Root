@@ -1,0 +1,71 @@
+# Chạy toàn bộ app trong Docker ở máy local (HTTP, không HTTPS): Postgres, MinIO, backend, frontend. Dùng qua ./deploy.sh.
+# Không dùng cho môi trường thật — xem docker-compose.prod.yml.
+name: giapha-local
+services:
+  postgres:
+    image: postgres:16.15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: giapha
+      POSTGRES_USER: giapha
+      POSTGRES_PASSWORD: giapha
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U giapha -d giapha"]
+      interval: 5s
+      retries: 20
+  # Kho ảnh tương thích S3. Dùng RustFS vì minio/minio đã bị gỡ khỏi Docker Hub.
+  # Giữ tên service "minio" để backend/biến MINIO_* không phải đổi.
+  minio:
+    image: rustfs/rustfs:1.0.3
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: minioadmin
+      RUSTFS_SECRET_KEY: minioadmin
+    ports: ["127.0.0.1:${MINIO_PORT:-7001}:9001"]
+    volumes: ["miniodata:/data"]
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio: { condition: service_started, required: false }
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/giapha
+      DB_USER: giapha
+      DB_PASSWORD: giapha
+      JWT_SECRET: local-dev-secret-local-dev-secret-0123456789
+      COOKIE_SECURE: "false"
+      SWAGGER_ENABLED: "true"
+      # Local: mọi request đi qua cùng một IP gateway của Docker nên hạn mức theo IP là của chung cả máy -> mặc định tắt.
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-false}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: giapha
+      DEV_SEED_PERSONS: ${DEV_SEED_PERSONS:-0}
+      BOOTSTRAP_ADMIN_USER: ${BOOTSTRAP_ADMIN_USER:-admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-password123}
+    ports: ["127.0.0.1:${API_PORT:-7080}:8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+  web:
+    build:
+      context: .
+      dockerfile: ops/caddy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend: { condition: service_healthy }
+    environment:
+      # ":80" = HTTP thuần, không tự bật HTTPS/redirect (chỉ dùng local)
+      DOMAIN: ":80"
+    ports: ["127.0.0.1:${WEB_PORT:-7070}:80"]
+volumes:
+  pgdata:
+  miniodata:
