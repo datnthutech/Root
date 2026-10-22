@@ -16,6 +16,10 @@ repositories {
     mavenCentral()
 }
 
+// Testcontainers 1.19.8 (mặc định của Spring Boot 3.3.5) gọi Docker qua unix socket bằng API 1.32,
+// bị Docker 29 từ chối ("client version 1.32 is too old") → CI trên runner Ubuntu 26 không chạy được test.
+ext['testcontainers.version'] = '1.21.4'
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
