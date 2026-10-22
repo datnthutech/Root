@@ -24,6 +24,13 @@ services:
       RUSTFS_SECRET_KEY: minioadmin
     ports: ["127.0.0.1:${MINIO_PORT:-7001}:9001"]
     volumes: ["miniodata:/data"]
+    # /health không cần xác thực, trả 200 khi sẵn sàng (đã kiểm trên rustfs/rustfs:1.0.3). Image có sẵn curl.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
   backend:
     build:
       context: .
@@ -31,7 +38,7 @@ services:
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
-      minio: { condition: service_started, required: false }
+      minio: { condition: service_healthy, required: false }
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/giapha
       DB_USER: giapha

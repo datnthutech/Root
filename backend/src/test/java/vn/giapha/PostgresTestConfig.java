@@ -11,6 +11,7 @@ public class PostgresTestConfig {
     @Bean
     @ServiceConnection
     PostgreSQLContainer<?> postgres() {
-        return new PostgreSQLContainer<>(DockerImageName.parse("postgres:16"));
+        // giữ trùng phiên bản với docker-compose
+        return new PostgreSQLContainer<>(DockerImageName.parse("postgres:16.15"));
     }
 }

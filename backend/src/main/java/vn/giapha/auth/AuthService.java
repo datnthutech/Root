@@ -1,8 +1,11 @@
 package vn.giapha.auth;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -12,8 +15,11 @@ import vn.giapha.common.ApiException;
 
 @Service
 public class AuthService {
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     static final int MAX_FAILED = 5;
     static final Duration LOCK_FOR = Duration.ofMinutes(15);
+    /** Cửa sổ cho phép nhiều tab cùng refresh một lúc; dùng lại token đã xoay sau cửa sổ này là bị đánh cắp. */
+    static final Duration REUSE_GRACE = Duration.ofSeconds(30);
 
     public record UserView(long id, String username, String displayName, Role role, Long linkedPersonId) {
         static UserView of(AppUser u) { return new UserView(u.getId(), u.getUsername(), u.getDisplayName(), u.getRole(), u.getLinkedPersonId()); }
@@ -25,16 +31,18 @@ public class AuthService {
     private final PasswordEncoder encoder;
     private final JwtService jwt;
     private final long refreshDays;
+    private final Clock clock;
     /** Băm giả để username không tồn tại cũng tốn thời gian BCrypt như tài khoản thật. */
     private final String dummyHash;
 
     public AuthService(AppUserRepository users, RefreshTokenRepository tokens, PasswordEncoder encoder, JwtService jwt,
-                       @Value("${app.jwt.refresh-days}") long refreshDays) {
+                       @Value("${app.jwt.refresh-days}") long refreshDays, Clock clock) {
         this.users = users;
         this.tokens = tokens;
         this.encoder = encoder;
         this.jwt = jwt;
         this.refreshDays = refreshDays;
+        this.clock = clock;
         this.dummyHash = encoder.encode("dummy-" + java.util.UUID.randomUUID());
     }
 
@@ -84,15 +92,37 @@ public class AuthService {
         return issue(u);
     }
 
-    @Transactional
+    /**
+     * Xoay refresh token. noRollbackFor: việc thu hồi phiên khi phát hiện dùng lại phải được lưu dù request trả 401.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
     public LoginResult refresh(String rawRefresh) {
         RefreshToken t = find(rawRefresh);
-        if (t == null || t.isRevoked() || t.getExpiresAt().isBefore(Instant.now())) throw unauth();
+        if (t == null) throw unauth();
+        if (t.isRevoked()) throw onRevokedReuse(t);
+        if (t.getExpiresAt().isBefore(clock.instant())) throw unauth();
         AppUser u = users.findById(t.getUserId()).orElseThrow(this::unauth);
         if (u.getStatus() != UserStatus.ACTIVE) throw unauth();
-        t.setRevoked(true);
-        tokens.save(t);
+        // cập nhật có điều kiện: nếu request đồng thời vừa xoay token này trước thì số dòng bằng 0
+        if (tokens.markRotated(t.getId(), clock.instant()) != 1) {
+            RefreshToken fresh = tokens.findById(t.getId()).orElseThrow(this::unauth);
+            throw onRevokedReuse(fresh);
+        }
         return issue(u);
+    }
+
+    /**
+     * Token đã bị thu hồi: trong cửa sổ ân hạn chỉ từ chối (nhiều tab); quá cửa sổ thì coi là bị dùng lại
+     * và thu hồi mọi phiên của user. Token thu hồi do logout/đổi mật khẩu (rotatedAt == null) chỉ bị từ chối.
+     */
+    private ApiException onRevokedReuse(RefreshToken t) {
+        Instant rotated = t.getRotatedAt();
+        if (rotated != null && rotated.plus(REUSE_GRACE).isBefore(clock.instant())) {
+            tokens.revokeAllForUser(t.getUserId());
+            log.warn("Phát hiện refresh token bị dùng lại: userId={}, tokenId={}; đã thu hồi mọi phiên của user",
+                t.getUserId(), t.getId());
+        }
+        return unauth();
     }
 
     @Transactional
